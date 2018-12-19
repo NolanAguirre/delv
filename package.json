@@ -1,0 +1,24 @@
+{
+  "name": "gql-cache",
+  "version": "0.0.1",
+  "description": "A light weight caching library for graphql queries",
+  "main": "gql-cache.js",
+  "scripts": {
+    "build": "babel src -d lib",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm run build && node lib/test.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "graphql": "^14.0.2",
+    "graphql-tag": "^2.10.0",
+    "axios": "^0.18.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.2.0",
+    "@babel/core": "^7.2.0",
+    "@babel/plugin-proposal-class-properties": "^7.2.1",
+    "@babel/preset-env": "^7.2.0"
+  }
+}
