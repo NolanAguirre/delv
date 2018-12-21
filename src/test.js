@@ -1,105 +1,123 @@
-import Query from './Query'
 const gql = require('graphql-tag')
 const util = require('util');
+const axios = require('axios')
+const cache = require('./Cache')
+import graphql from 'graphql-anywhere'
+import betterThanApollo from './gql-cache'
+var fs = require('fs');
+var _ = require('lodash');
 
-class GQLParser {
-    constructor() {
-
-    }
-
-    reduce = (query) => {
-        function helper(obj) {
-            if (obj.selectionSet) {
-                let returnValue = {}
-                obj.selectionSet.selections.map((newObj) => {
-                    if (newObj.name.value == 'nodes') {
-                        let helperValue = helper(newObj)
-                        returnValue[helperValue.key] = [helperValue.value]
-                    } else {
-                        let helperValue = helper(newObj)
-                        returnValue[helperValue.key] = helperValue.value
-                    }
-                })
-                return {
-                    key: obj.name.value,
-                    value: returnValue
-                }
-            } else {
-                if(obj.kind === 'FragmentSpread'){
-                    return{
-                        key: 'Fragment',
-                        value: obj.name.value
-                    }
-                }
-                return {
-                    key: obj.name.value,
-                    value: ""
-                }
-            }
+const resolver = (fieldName, root, args, context, info) => {
+    // if(info.isLeaf){
+    //     return root[fieldName];
+    // }else if(fieldName === 'nodes' && Object.keys(root) > 0){
+    //     if(false && root.args){
+    //         //filter data
+    //     }else{
+    //         let nodes = [];
+    //         for(var key in root){
+    //             nodes.push(cache.cache[root[key]][key])
+    //         }
+    //         return nodes;
+    //     }
+    // }else if(root[fieldName] instanceof Object){
+    //     if(!Array.isArray(root[fieldName])){
+    //         return cache.getByName(fieldName)[root[fieldName].nodeId]
+    //     }
+    // }
+    if(fieldName === 'nodes'){
+        let nodes = [];
+           for(var key in root){
+               nodes.push(cache.cache[root[key]][key])
+           }
+        return nodes;
+    }else if(info.isLeaf){
+        return root[fieldName];
+    }else if(Array.isArray(root[fieldName])){
+        if(root[fieldName].length > 0){
+            return cache.getByName(fieldName)
+        }else{
+            return cache.getByName(fieldName)
         }
-        function Helper(obj){
-            return {[obj.name.value]:helper(obj).value};
-        }
-        let foo;
-        query.definitions.forEach((definition) => {
-            foo = Helper(definition)
-            console.log(util.inspect(foo, false, null, true /* enable colors */ ))
-        })
+    }else if(typeof root[fieldName] === 'object' && root[fieldName] != {}){
+        return cache.getByName(fieldName)[fieldName.nodeId]
     }
+    return cache.getByName(fieldName);
+};
 
-    getOperations = (query, type) => {
-        return query.definitions.filter((definition) => {
-            return definition.operation === type
-        })
-    }
-
-    getName = (query) => {
-        let operations = this.getOperations(query, 'query');
-        if (operations.length === 1) {
-            return operations[0].name && operations[0].name.value
-        } else {
-            throw new Error('multiple queries are not supported, break up queries into their own file/string')
-        }
-
-    }
-}
-
-let temp = new GQLParser();
-
-temp.reduce(gql `query foo{
-   allActivityCatagories{
-    nodes {
-      ...temp
-      activitiesByType {
-        nodes {
+const apollo = new betterThanApollo('http://localhost:3005/graphql')
+const query = gql`{
+  allActivityCatagories{
+    nodes{
+      name
+      nodeId
+      activitiesByType{
+        nodes{
           nodeId
           name
           description
-          id
-          activityPrerequisitesByPrerequisite{
+          eventsByEventType{
             nodes{
               nodeId
               id
-        			activityByPrerequisite{
-                nodeId
-                id
-                activityCatagoryByType{
+              dateGroupsByEvent{
+                nodes{
                   nodeId
-                  name
-                  id
+                  price
+                  openRegistration
+                  closeRegistration
                 }
               }
             }
+          }
+          activityCatagoryByType{
+            nodeId
+            name
           }
         }
       }
     }
   }
-}
+}`
 
-fragment temp on ActivityCatagory{
-	name
-  id
-  nodeId
-}
-`)
+apollo.query({query: `{
+  allActivityCatagories{
+    nodes{
+      name
+      nodeId
+      activitiesByType{
+        nodes{
+          nodeId
+          name
+          description
+          eventsByEventType{
+            nodes{
+              nodeId
+              id
+              dateGroupsByEvent{
+                nodes{
+                  nodeId
+                  price
+                  openRegistration
+                  closeRegistration
+                }
+              }
+            }
+          }
+          activityCatagoryByType{
+            nodeId
+            name
+          }
+        }
+      }
+    }
+  }
+}`,options:{
+resolve:(data)=>{
+    var json = JSON.stringify(data);
+    fs.writeFile('query.json', json, 'utf8', (error) => console.log(error));
+    const cacheResult = graphql(resolver, gql`${query}`, cache)
+    console.log(_.isEqual(data, cacheResult))
+    json = JSON.stringify(cacheResult);
+    fs.writeFile('example.json', json, 'utf8', (error) => console.log(error));
+}}})
