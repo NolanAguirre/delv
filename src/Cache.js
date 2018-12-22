@@ -45,21 +45,71 @@ class Cache {
         return pluralize.singular(type.slice(0,-10))
     }
 
+    formatObject = (object, parentType) => {
+        let returnVal = {};
+        for(var key in object){
+            let value = object[key]
+            if(value instanceof Object){
+                const rootType = this.fields.get(key)
+                if(!rootType){
+                    throw new Error(`Line 76: A type was not mapped for field ${rootName}`)
+                }
+                if(value.nodes){
+                    let nodes =  value.nodes.map((node)=>{
+                        if(node.nodeId){
+                            this.formatObject(node, this.guessChildType(rootType))
+                            return node.nodeId
+                        }else{
+                            throw new Error('Line 57: query object did not have required field nodeId')
+                        }
+                    });
+
+                    returnVal[rootType] = {
+                        [this.guessChildType(rootType)]:nodes
+                    }
+                }else{
+                    if(value.nodeId){
+                        this.formatObject(value, rootType)
+                        returnVal[rootType] = value.nodeId
+                    }else{
+                        throw new Error('Line 64: query object did not have required field nodeId')
+                    }
+                }
+            }else{
+                returnVal[key] = object[key]
+            }
+        }
+        if(parentType){
+            if(!this.cache[parentType]){
+                this.cache[parentType] = {}
+            }
+            this.cache[parentType][object.nodeId] = returnVal;
+        }
+        return returnVal;
+    }
+
+    filterCacheById = (type, ids) => {
+        return _.pickBy(this.cache[type], function(value, key) {
+            return ids.includes(key)
+        });
+    }
+
     processQuerySection = (section, rootType) => {
         let isOneToOne = true;
         if(!rootType){
-            throw new Error(`A type was not mapped for field ${rootName}`)
+            throw new Error(`Line 76: A type was not mapped for field ${rootName}`)
         }
-        if (!this.cache[rootType]) {
-            this.cache[rootType] = {}
-        }
+
         for (var key in section) {
             if (Array.isArray(section[key])) {
                 isOneToOne = false;
+                if (!this.cache[rootType]) {
+                    this.cache[rootType] = []
+                }
                 section[key].forEach((node) => {
 
                     let childType = this.guessChildType(rootType)
-                    this.cache[rootType][node.nodeId] = childType;
+                    this.cache[rootType].push(node.nodeId)
                     if(!this.cache[childType]){
                         this.cache[childType] = {}
                     }
