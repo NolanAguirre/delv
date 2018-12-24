@@ -1,17 +1,56 @@
 const gql = require('graphql-tag')
 const util = require('util');
+import graphql from 'graphql-anywhere'
 var _ = require('lodash');
 var pluralize = require('pluralize')
 var fs = require('fs');
 
 const blacklistFields = ['node', 'id', 'nodeId', 'nodes', 'edges']
 
-const blacklistTypes = [null,'Node', 'Int', 'String', 'Cursor', 'UUID', 'Boolean', 'PageInfo', 'Float', 'Mutation', 'ID', 'Datetime', '__Type',  '__Schema', '__Directive', '__EnumValue', '__Field', '__InputValue']
+const blacklistTypes = [null, 'Node', 'Int', 'String', 'Cursor', 'UUID', 'Boolean', 'PageInfo', 'Float', 'Mutation', 'ID', 'Datetime', '__Type',  '__Schema', '__Directive', '__EnumValue', '__Field', '__InputValue']
 
 class Cache {
     constructor() {
         this.cache = {};
         this.fields = new Map();
+        this.queries = {};
+    }
+
+    resolver = (fieldName, root, args, context, info) => {
+        if(info.isLeaf){
+            if(root.hasOwnProperty(fieldName)){
+                return root[fieldName];
+            }else{
+                throw new Error('Some of the data requested in the query is not in the cache')
+            }
+        }
+        if(fieldName === 'nodes'){
+            return Object.values(root)
+        }
+        let fieldType = this.fields.get(fieldName);
+        if(fieldType){
+            if(fieldType.endsWith('Connection')){
+                if(root === null){
+                    let temp = this.cache[this.guessChildType(fieldType)];
+                    if(temp){
+                        return temp;
+                    }else{
+                        throw new Error('Some of the data requested in the query is not in the cache')
+                    }
+                }
+                let connections =  root[fieldType]
+                if(connections){
+                    let childType = Object.keys(connections)[0]
+                    let ids = connections[childType]
+                    return this.filterCacheById(childType, ids)
+                }else{
+                    throw new Error('Some of the data requested in the query is not in the cache')
+                }
+            }
+            return this.cache[fieldType][root[fieldType]]
+        }
+
+        return {};
     }
 
     loadIntrospection = (queryResult) => {
@@ -30,18 +69,22 @@ class Cache {
         })
     }
 
-    getIds = (obj) => {
-        if(obj.nodeId){
-            return {nodeId: obj.nodeId}
-        }
-        return obj.nodes.map((o)=> {return o.nodeId})
-    }
-
     guessParentType = (type) => {
         return pluralize(type) + "Connection"
     }
+
     guessChildType = (type) => {
         return pluralize.singular(type.slice(0,-10))
+    }
+
+    customizer = (objValue, srcValue, key, object, source, stack) => {
+        if(Array.isArray(objValue)){
+            return _.union(objValue, srcValue);
+        }
+    }
+
+    merge = (oldObj, newObj) => {
+        return _.mergeWith(oldObj, newObj, this.customizer);
     }
 
     formatObject = (object, parentType) => {
@@ -51,13 +94,13 @@ class Cache {
             if(value instanceof Object){
                 const rootType = this.fields.get(key)
                 if(!rootType){
-                    throw new Error(`Line 76: A type was not mapped for field ${rootName}`)
+                    throw new Error(`Line 76: A type was not mapped for field ${rootType}`)
                 }
                 if(value.nodes){
-                    let nodes =  value.nodes.map((node)=>{
+                    let nodes = value.nodes.map((node)=>{
                         if(node.nodeId){
                             this.formatObject(node, this.guessChildType(rootType))
-                            return node.nodeId
+                            return node.nodeId;
                         }else{
                             throw new Error('Line 57: query object did not have required field nodeId')
                         }
@@ -82,9 +125,13 @@ class Cache {
             if(!this.cache[parentType]){
                 this.cache[parentType] = {}
             }
-            this.cache[parentType][object.nodeId] = returnVal;
+            let cacheVal = this.cache[parentType][object.nodeId]
+            if(cacheVal){
+                this.cache[parentType][object.nodeId] = this.merge(cacheVal, returnVal)
+            }else{
+                this.cache[parentType][object.nodeId] = returnVal;
+            }
         }
-        return returnVal;
     }
 
     filterCacheById = (type, ids) => {
@@ -93,62 +140,23 @@ class Cache {
         });
     }
 
-    processQuerySection = (section, rootType) => {
-        let isOneToOne = true;
-        if(!rootType){
-            throw new Error(`Line 76: A type was not mapped for field ${rootName}`)
-        }
-
-        for (var key in section) {
-            if (Array.isArray(section[key])) {
-                isOneToOne = false;
-                if (!this.cache[rootType]) {
-                    this.cache[rootType] = []
-                }
-                section[key].forEach((node) => {
-
-                    let childType = this.guessChildType(rootType)
-                    this.cache[rootType].push(node.nodeId)
-                    if(!this.cache[childType]){
-                        this.cache[childType] = {}
-                    }
-                    this.cache[childType][node.nodeId] = _.cloneDeep(node);
-                    for (var nodeKey in node) {
-                        if (typeof node[nodeKey] === 'object') {
-                            this.cache[childType][node.nodeId][nodeKey] = this.getIds(node[nodeKey]);
-                            this.processQuerySection(node[nodeKey], this.fields.get(nodeKey))
-                        }
-                    }
-
-                })
-            }
-        }
-        if(isOneToOne){
-            let parentType = this.guessParentType(rootType)
-            if(!this.cache[parentType]){
-                this.cache[parentType] = {};
-            }
-            this.cache[parentType][section.nodeId] = rootType
-            this.cache[rootType][section.nodeId] = section
-        }
-    }
-
     processIntoCache = (queryResult) => {
         let result = _.cloneDeep(queryResult)
-        for (var key in result) {
-            this.processQuerySection(result[key], this.fields.get(key))
-        }
+        this.formatObject(result)
         var json = JSON.stringify(this.cache);
         fs.writeFile('cache.json', json, 'utf8', (error) => console.log(error));
-        //console.log(util.inspect(result, false, null, true /* enable colors */ ));
-    }
-    getType = (name) => {
-        return this.fields.get(name);
-    }
-    getByName = (name) => {
-        return this.cache[this.fields.get(name)];
     }
 
+    loadQuery = (query) => {
+        try{
+            return {data:graphql(this.resolver, gql`${query}`, null)}
+        } catch(error){
+            if(error.message === 'Some of the data requested in the query is not in the cache'){
+                return {query:true}
+            }
+            return error
+        }
+    }
 }
 
 module.exports = new Cache();
