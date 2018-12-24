@@ -28,7 +28,6 @@ class Cache {
                 })
             }
         })
-        //console.log(this.fields)
     }
 
     getIds = (obj) => {

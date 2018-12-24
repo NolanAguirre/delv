@@ -6,7 +6,7 @@ import React, {
 const axios = require('axios')
 const cache = require('./Cache')
 
-module.exports = class betterThanApollo {
+module.exports = class Delv {
     constructor(url) {
         this.url = url;
         this.isReady = false
@@ -40,10 +40,7 @@ module.exports = class betterThanApollo {
         })
     }
 
-    query = ({
-        query,
-        options
-    }) => {
+    query = ({query, options}) => {
         if (this.isReady) {
             axios.post(this.url, {
                 query

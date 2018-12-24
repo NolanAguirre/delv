@@ -3,11 +3,11 @@ const util = require('util');
 const axios = require('axios')
 const cache = require('./Cache')
 import graphql from 'graphql-anywhere'
-import betterThanApollo from './gql-cache'
+import Delv from './j-delv'
 var fs = require('fs');
 var _ = require('lodash');
 
-new betterThanApollo('http://localhost:3005/graphql');
+new Delv('http://localhost:3005/graphql');
 setTimeout(test, 1000)
 const query = `{
   allActivityCatagories{
@@ -134,80 +134,3 @@ const resolver = (fieldName, root, args, context, info) => {
         return root[fieldName];
     }
 };
-//
-// const apollo = new betterThanApollo('http://localhost:3005/graphql')
-// const query = gql`{
-//   allActivityCatagories{
-//     nodes{
-//       name
-//       nodeId
-//       activitiesByType{
-//         nodes{
-//           nodeId
-//           name
-//           description
-//           eventsByEventType{
-//             nodes{
-//               nodeId
-//               id
-//               dateGroupsByEvent{
-//                 nodes{
-//                   nodeId
-//                   price
-//                   openRegistration
-//                   closeRegistration
-//                 }
-//               }
-//             }
-//           }
-//           activityCatagoryByType{
-//             nodeId
-//             name
-//           }
-//         }
-//       }
-//     }
-//   }
-// }`
-//
-// apollo.query({query: `{
-//   allActivityCatagories{
-//     nodes{
-//       name
-//       nodeId
-//       activitiesByType{
-//         nodes{
-//           nodeId
-//           name
-//           description
-//           eventsByEventType{
-//             nodes{
-//               nodeId
-//               id
-//               dateGroupsByEvent{
-//                 nodes{
-//                   nodeId
-//                   price
-//                   openRegistration
-//                   closeRegistration
-//                 }
-//               }
-//             }
-//           }
-//           activityCatagoryByType{
-//             nodeId
-//             name
-//           }
-//         }
-//       }
-//     }
-//   }
-// }`,options:{
-// resolve:(data)=>{
-//     var json = JSON.stringify(data);
-//     fs.writeFile('query.json', json, 'utf8', (error) => console.log(error));
-//     const cacheResult = graphql(resolver, gql`${query}`, cache)
-//     console.log(_.isEqual(data, cacheResult))
-//     json = JSON.stringify(cacheResult);
-//     fs.writeFile('example.json', json, 'utf8', (error) => console.log(error));
-// }}})
