@@ -1,7 +1,7 @@
 const gql = require('graphql-tag')
 const util = require('util');
 const axios = require('axios')
-const cache = require('./Cache')
+import cache from './Cache'
 import graphql from 'graphql-anywhere'
 import Delv from './delv'
 var fs = require('fs');
@@ -12,7 +12,7 @@ Delv.setURL('http://localhost:3005/graphql');
 Delv.loadIntrospection();
 
 setTimeout(test, 1000)
-setTimeout(test2, 2000)
+// setTimeout(test2, 2000)
 // setTimeout(test3, 3000)
 const query = `{
   allActivityCatagories{
@@ -97,40 +97,42 @@ const query3 = `{
 
 
 function test() {
-    Delv.query(query, {
-        networkPolicy: 'cache-first',
-        onFetch: () => {},
-        resolve: (data) => {
+
+    Delv.query({
+        query:query,
+        networkPolicy:'network-once',
+        onResolve: (data) => {
             const resolver = cache.resolver
             fs.writeFile('query.json', JSON.stringify(data), 'utf8', (error) => {
                 if (error) {
                     console.log(error)
                 }
             });
-            //const cacheResult = graphql(resolver, gql `${query}`, cache.cache)
+            // const cacheResult = graphql(cache.resolver, gql `${query}`, cache.cache)
             // console.log(_.isEqual(data, cacheResult))
             // fs.writeFile('example.json', JSON.stringify(cacheResult), 'utf8', (error) => {
             //     if (error) {
             //         console.log(error)
             //     }
             // });
-        }
+        },
+        onFetch: () => {}
     })
 }
-function test2() {
-    Delv.query(query, {
-        networkPolicy: 'cache-first',
-        onFetch: () => {},
-        resolve: (data) => {
-            fs.writeFile('example.json', JSON.stringify(data), 'utf8', (error) => {
-                if (error) {
-                    console.log(error)
-                }
-            });
-            //console.log(_.isEqual(data, cacheResult)
-        }
-    })
-}
+// function test2() {
+//     Delv.query(query, {
+//         networkPolicy: 'cache-first',
+//         onFetch: () => {},
+//         resolve: (data) => {
+//             fs.writeFile('example.json', JSON.stringify(data), 'utf8', (error) => {
+//                 if (error) {
+//                     console.log(error)
+//                 }
+//             });
+//             //console.log(_.isEqual(data, cacheResult)
+//         }
+//     })
+// }
 //
 // function test2() {
 //     delv.query(

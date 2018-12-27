@@ -40,6 +40,8 @@ class TypeMap {
     guessChildType = (type) => {
         if(type.endsWith('Connection')){
             return pluralize.singular(type.slice(0,-10))
+        }else if(type.endsWith('Edge')){
+            return pluralize.singular(type.slice(0,-10))
         }
         return type;
     }

@@ -4,11 +4,14 @@ import CacheEmitter from './CacheEmitter';
 const gql = require('graphql-tag')
 const util = require('util');
 var _ = require('lodash');
+var fs = require('fs');
 
+let UID = 'nodeId'
 
 class Cache {
     constructor() {
         this.cache = {};
+        //{(\n)
     }
 
     resolver = (fieldName, root, args, context, info) => {
@@ -16,7 +19,7 @@ class Cache {
             if (root.hasOwnProperty(fieldName)) {
                 return root[fieldName];
             } else {
-                throw new Error('Some of the data requested in the query is not in the cache')
+                throw new Error('Some of the leaf data requested in the query is not in the cache')
             }
         }
         if (fieldName === 'nodes') {
@@ -30,18 +33,18 @@ class Cache {
             let connections = root[fieldType]
             if (connections) {
                 let ids
-                if(connections instanceof Object){
-                    if(Array.isArray(connections)){
+                if (connections instanceof Object) {
+                    if (Array.isArray(connections)) {
                         ids = connections;
-                    }else{
+                    } else {
                         ids = Object.keys(connections);
                     }
-                }else{
+                } else {
                     return this.cache[fieldType][connections]
                 }
 
                 let nextRoot = this.filterCacheById(fieldType, ids)
-                if(args){
+                if (args) {
                     return this.filterCache(nextRoot, args)
                 }
                 return nextRoot
@@ -53,17 +56,18 @@ class Cache {
     }
 
     filterCache = (set, args) => {
-        if(args.condition){
+        //TODO handle args.filter
+        if (args.condition) {
             return _.pickBy(set, function(value, key) {
                 let match = true;
-                for(let k in args.condition){
-                    if(value[k] !== args.condition[k]){
+                for (let k in args.condition) {
+                    if (value[k] !== args.condition[k]) {
                         match = false;
                     }
                 }
                 return match;
             });
-        }else{
+        } else {
             return set;
         }
     }
@@ -77,52 +81,74 @@ class Cache {
         return _.mergeWith(oldObj, newObj, customizer);
     }
 
-    formatObject = (object, parentType) => {
-        let returnVal = {};
-        for (var key in object) {
-            let value = object[key]
-            if (value instanceof Object) {
-                const rootType = typeMap.get(key)
-                if (!rootType) {
-                    throw new Error(`Line 76: A type was not mapped for field ${rootType}`)
-                }
-                if (value.nodes) {
-                    let nodes = value.nodes.map((node) => {
-                        if (node.nodeId) {
-                            this.formatObject(node, typeMap.guessChildType(rootType))
-                            return node.nodeId;
-                        } else {
-                            throw new Error('Line 57: query object did not have required field nodeId')
-                        }
-                    });
-
-                    returnVal[typeMap.guessChildType(rootType)] = nodes
-                } else {
-                    if (value.nodeId) {
-                        this.formatObject(value, rootType)
-                        returnVal[rootType] = value.nodeId
-                    } else {
-                        throw new Error('Line 64: query object did not have required field nodeId')
-                    }
-                }
-            } else {
-                returnVal[key] = object[key]
+    isLeaf = (obj) => {
+        for (let key in obj) {
+            if (obj[key] instanceof Object) {
+                return false;
             }
         }
-        if (parentType) {
-            if (!this.cache[parentType]) {
-                this.cache[parentType] = {}
+        return true;
+    }
+
+    getChildType = (obj) => {
+        if(Array.isArray(obj)){
+            if(obj.length > 0){
+                return obj[0]['__typename']
             }
-            let cacheVal = this.cache[parentType][object.nodeId]
-            if (cacheVal) {
-                if (!_.isEqual(cacheVal, returnVal)) {
-                    CacheEmitter.changeType(parentType)
-                    this.cache[parentType][object.nodeId] = this.merge(cacheVal, returnVal)
+        }else{
+            return typeMap.guessChildType(obj['__typename'])
+        }
+    }
+
+    formatObject = (object) => {
+        if(this.isLeaf(object)){
+            this.updateCacheValue(object)
+            return object[UID]
+        }else if(Array.isArray(object)){
+            return object.map((obj)=>{
+                this.formatObject(obj)
+                return obj[UID]
+            })
+        }else if(object['__typename'].endsWith('Connection')){
+            if(object.nodes){
+                return object.nodes.map((obj) => {
+                    this.formatObject(obj)
+                    return obj[UID]
+                })
+            }else if(object.edges){
+                return object.edges.map((obj) => {
+                    this.formatObject(obj.node)
+                    return obj.node[UID]
+                })
+            }
+        }else {
+            let clone = _.cloneDeep(object)
+            for(let key in clone){
+                let value = clone[key]
+                if(value instanceof Object){
+                    delete clone[key]
+                    clone[this.getChildType(value)] = this.formatObject(value);
                 }
-            } else {
-                CacheEmitter.changeType(parentType)
-                this.cache[parentType][object.nodeId] = returnVal;
             }
+            this.updateCacheValue(clone)
+            return clone.nodeId;
+        }
+    }
+
+    updateCacheValue = (obj) => {
+        let typename = obj['__typename']
+        if (!this.cache[typename]) {
+            this.cache[typename] = {}
+        }
+        let cacheVal = this.cache[typename][obj[UID]]
+        if (cacheVal) {
+            if (!_.isEqual(cacheVal, obj)) {
+                CacheEmitter.changeType(typename)
+                this.cache[typename][obj[UID]] = this.merge(cacheVal, obj)
+            }
+        } else {
+            CacheEmitter.changeType(typename)
+            this.cache[typename][obj[UID]] = obj;
         }
     }
 
@@ -134,23 +160,32 @@ class Cache {
 
     processIntoCache = (queryResult) => {
         let result = _.cloneDeep(queryResult)
-        this.formatObject(result)
+        Object.values(result).forEach((obj)=>{
+            if(obj instanceof Object){
+                this.formatObject(obj)
+            }
+        })
         CacheEmitter.emitCacheUpdate();
+        fs.writeFile('example.json', JSON.stringify(this.cache), 'utf8', (error) => {
+            if (error) {
+                console.log(error)
+            }
+        });
     }
 
     loadQuery = (query) => {
         try {
             return graphql(this.resolver, gql `${query}`, this.cache)
         } catch (error) {
-            if (error.message === 'Some of the data requested in the query is not in the cache') {
-                return {
-                    query: true
-                }
+            return {
+                error: error.message
             }
-            return {}
         }
     }
-}
 
+    clearCache = () => {
+        this.cache = {};
+    }
+}
 
 export default new Cache();

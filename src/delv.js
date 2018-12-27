@@ -3,16 +3,11 @@ import util from 'util'
 import TypeMap from './TypeMap'
 import axios from 'axios'
 import cache from './Cache'
-
+import QueryManager from './QueryManager'
 class Delv {
     setURL = (url) => {
         this.url = url
-        this.queries = [];
-    }
-
-    registerMount = (mount) => {
-        //this.mount = mount
-        this.loadIntrospection()
+        this.queries = new QueryManager();
     }
 
     loadIntrospection = () => {
@@ -35,58 +30,90 @@ class Delv {
           }`
         }).then((res) => {
             TypeMap.loadIntrospection(res.data.data);
-            //this.mount.isReady();
         }).catch((error) => {
             throw new Error('Something went wrong while attempting making introspection query ' + error)
         })
     }
 
-    post = (query, options) => {
-        options.onFetch();
-        axios.post(this.url, {
-            query
-        }).then((res) => {
-            cache.processIntoCache(res.data.data)
-            return res;
-        }).then((res) => {
-            options.resolve(res.data.data)
+    getAuthToken = () => {
+        return null
+        return localStorage.getItem('authToken')
+    }
+
+    post = (query, variables) => {
+        let token = this.getAuthToken();
+        let config = {};
+        if(token){
+            config = {
+                headers: {'Authorization': "bearer " + token}
+            };
+        }
+        return axios.post(this.url, {
+            query: this.queries.addTypename(query),
+            variables
+        }, config)
+    }
+
+    queryHttp = (query, variables, onFetch, onResolve) => {
+        this.queries.add(query, variables)
+        onFetch();
+        let promise = this.post(query, variables).then((res) => {
+            try{
+                cache.processIntoCache(res.data.data)
+            } catch(error) {
+                console.log(`Error occured trying to cach responce data: ${error.message}`)
+            }
+            onResolve(res.data.data)
+            this.queries.setPromise(query, variables, null);
         }).catch((error) => {
-            throw new Error('error with query ' + error.message);
+            throw new Error(`Error occured while making query ${error.message}`);
             return;
         })
+        this.queries.setPromise(query, variables, promise)
     }
 
-    normalizeQuery = (query, variable)  => {
-        return `${query}${JSON.stringify(variable)}`.replace(/(\s)+/g, '');
-    }
-
-    query = (query, options) => {
-        if (options.networkPolicy === 'cache-first') {
-            try {
-                let data = cache.loadQuery(query)
-                if (data.data) {
-                    options.resolve(data.data);
-                } else {
-                    this.post(query, options)
-                }
-            } catch (error) {
-                console.log(error)
-                return;
-            }
-        } else if (options.networkPolicy === 'cache-only') {
-            options.resolve(cache.loadQuery(query));
-        } else if (options.networkPolicy === 'network-only') {
-            this.post(query, options)
-        } else if (options.networkPolicy === 'network-once') {
-            let normalized = this.normalizeQuery(query, options.variable)
-            if(this.queries.includes(normalized)){
-                options.resolve(cache.loadQuery(query));
-            }else{
-                this.queries.push(normalized);
-                this.post(query, options)
-            }
+    query = ({query, variables, networkPolicy, onFetch, onResolve}) => {
+        switch(networkPolicy){
+            case 'cache-first':
+                this.cacheFirst()
+                break
+            case 'cache-only':
+                onResolve(cache.loadQuery(query))
+                break
+            case 'network-only':
+                this.queryHttp(query, variables, onFetch, onResolve)
+                break
+            case 'network-once':
+                this.networkOnce(query, variables, onFetch, onResolve)
+                break
         }
     }
+
+    cacheFirst = (query, variables, onFetch, onResolve) => {
+        let data = cache.loadQuery(query)
+        if (data.data) {
+            onResolve(data.data);
+        } else {
+            this.queryHttp(query, variables, onFetch, onResolve)
+        }
+    }
+
+    networkOnce = (query, variables, onFetch, onResolve) => {
+        if(this.queries.includes(query, variables)){
+            let promise = this.queries.getPromise(query.variables)
+            if(promise){
+                console.log('adding to promise')
+                promise.then((res) => {
+                    onResolve(res.data.data)
+                })
+            }else{
+                onResolve(cache.loadQuery(query))
+            }
+        }else{
+            this.queryHttp(query, variables, onFetch, onResolve)
+        }
+    }
+
 }
 
 export default new Delv();

@@ -3,7 +3,6 @@ import EventEmitter from 'events'
 class CacheEmitter extends EventEmitter{
     constructor(){
         super();
-        console.log(this)
         this.changedTypes = [];
     }
     changeType = (type) => {
