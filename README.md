@@ -1,19 +1,6 @@
-# j-delv
+# delv
 
-Delv is a GraphQL caching and query level made to work with postgraphile. As of now it only supports postgraphile query structures
-using nodes as to represent one to many relationships, however it doesn't have the issues that apollo has, as it stores the the query data by type, not query.
-This allows for you to add to the cache and have any query that pulls from that given type auto update. The downside is this guesses types using postgraphile naming conventions.
-
-example of the guesses
-
-allActivityCatagories is type ActivitiesConnection
-
-holding type nodes
-
-guess type of nodes by removing "Connection" and making the result singular
-
-which yields Activity from ActivitiesConnection, which will work with postgraphile and nodes.
+Delv is a caching and query layer for Graphql, built around postgraphile's query structure. Instead of preserving the structure of the query like mainstream caching libraries, Delv stores each node by type, saving references by type and a UID. This approach has a few downsides, such as the loss of pagination data, and issues caching data that has two fields of the same user defined type, such as a join table between two users. The upside to this approach is all the data is kept up to date even after a mutation, there is no need to update the cache per query, or re-query the database, after a mutation.
 
 
-
-no where near finished and documentation is still needed.
+Still in the works, some of the kinks will be worked out with time.
