@@ -52,6 +52,9 @@ class Cache {
             }
             return this.cache[childType][ids]
         } else {
+            if (this.cache[fieldType][this.cache[fieldName]]) {
+                return this.cache[fieldType][this.cache[fieldName]]
+            }
             if (conflict) {
                 return this.cache[fieldType][root[fieldName]]
             } else {
@@ -178,7 +181,20 @@ class Cache {
                 })
             }
         }
+
         let clone = _.cloneDeep(object);
+        if(parentObject){
+                let temp = clone[parentObject.type]
+                if(temp){
+                    if(Array.isArray(temp)){
+                        clone[parentObject.type] = [...temp, parentObject.uid]
+                    }else{
+                        clone[parentObject.type] = [temp, parentObject.uid]
+                    }
+                }else{
+                    clone[parentObject.type] = parentObject.uid
+                }
+        }
         let type = clone['__typename']
         for (let key in object) {
             if (key === '__typename') {
@@ -201,9 +217,6 @@ class Cache {
                         delete clone[key]
                     }
                 } else {
-                    if (this.cache[fieldType][this.cache[fieldName]]) {
-                        return this.cache[fieldType][this.cache[fieldName]]
-                    }
                     if (conflict) {
                         clone[key] = this.formatObject(value, false, {
                             type: conflict,
