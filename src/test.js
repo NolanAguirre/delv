@@ -15,32 +15,42 @@ setTimeout(test, 1000)
 // setTimeout(test2, 2000)
 // setTimeout(test3, 3000)
 const query = `{
-  allActivityCatagories{
-    nodes{
-      name
+  allActivityCatagories {
+    nodes {
       nodeId
-      activitiesByType{
-        nodes{
+      id
+      name
+    }
+  }
+  allActivities {
+    nodes {
+      nodeId
+      id
+      description
+      name
+      eventsByEventType {
+        nodes {
           nodeId
-          name
-          description
-          eventsByEventType{
-            nodes{
-              nodeId
-              id
-              dateGroupsByEvent{
-                nodes{
-                  nodeId
-                  price
-                  openRegistration
-                  closeRegistration
-                }
-              }
-            }
-          }
-          activityCatagoryByType{
-            nodeId
+          id
+        }
+      }
+      activityCatagoryByType {
+        id
+        nodeId
+      }
+      activityPrerequisitesByActivity {
+        nodes {
+          id
+          nodeId
+          activityByPrerequisite {
             name
+            id
+            nodeId
+          }
+          activityByActivity {
+            name
+            id
+            nodeId
           }
         }
       }
@@ -93,8 +103,21 @@ const query3 = `{
   }
 }`
 
-
-
+function compare(a,b){
+    if(Array.isArray(a) && Array.isArray(b)){
+        let temp = true;
+        a.forEach((item)=>{
+            let flag = false;
+            b.forEach((itemTwo)=>{
+                if(_.isEqualWith(item, itemTwo, compare)){
+                    flag = true;
+                }
+            })
+            temp = temp && flag
+        })
+        return temp
+    }
+}
 
 function test() {
 
@@ -108,13 +131,14 @@ function test() {
                     console.log(error)
                 }
             });
-            // const cacheResult = graphql(cache.resolver, gql `${query}`, cache.cache)
-            // console.log(_.isEqual(data, cacheResult))
-            // fs.writeFile('example.json', JSON.stringify(cacheResult), 'utf8', (error) => {
-            //     if (error) {
-            //         console.log(error)
-            //     }
-            // });
+            const cacheResult = graphql(cache.resolver, gql `${query}`, cache.cache)
+            console.log(_.isEqualWith(data, cacheResult, compare));
+            fs.writeFile('example.json', JSON.stringify(cacheResult), 'utf8', (error) => {
+                if (error) {
+                    console.log(error)
+                }
+            });
+
         },
         onFetch: () => {}
     })

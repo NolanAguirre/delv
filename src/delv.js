@@ -54,6 +54,23 @@ class Delv {
         }, config)
     }
 
+    stripTypenames = (obj) => {
+        delete obj['__typename']
+        Object.values(obj).forEach((value) => {
+            if(value instanceof Object){
+                if(Array.isArray(value)){
+                    value.forEach((item)=>{
+                        if(item instanceof Object){
+                            this.stripTypenames(item)
+                        }
+                    })
+                }else{
+                    this.stripTypenames(value)
+                }
+            }
+        })
+    }
+
     queryHttp = (query, variables, onFetch, onResolve) => {
         this.queries.add(query, variables)
         onFetch();
@@ -63,6 +80,7 @@ class Delv {
             } catch(error) {
                 console.log(`Error occured trying to cach responce data: ${error.message}`)
             }
+            this.stripTypenames(res.data.data)
             onResolve(res.data.data)
             this.queries.setPromise(query, variables, null);
         }).catch((error) => {
