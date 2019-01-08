@@ -33,28 +33,28 @@ class Cache {
 
         let conflict = this.keyConflict.get(fieldName)
         let fieldType = typeMap.get(fieldName);
-        if(fieldType.endsWith('Connection')){
+        if (fieldType.endsWith('Connection')) {
             let childType = typeMap.guessChildType(fieldType);
             let rootAccessor = childType
-            if(conflict){
+            if (conflict) {
                 rootAccessor = fieldName
             }
             let ids = root[rootAccessor];
-            if(ids instanceof Object){
-                if(!Array.isArray(ids)){
+            if (ids instanceof Object) {
+                if (!Array.isArray(ids)) {
                     ids = Object.keys(ids)
                 }
                 let intersection = this.filterCacheByIds(childType, ids);
-                if(args){
+                if (args) {
                     return this.filterCache(intersection, args)
                 }
                 return intersection;
             }
             return this.cache[childType][ids]
-        }else{
-            if(conflict){
+        } else {
+            if (conflict) {
                 return this.cache[fieldType][root[fieldName]]
-            }else{
+            } else {
                 return this.cache[fieldType][root[fieldType]]
             }
         }
@@ -180,25 +180,40 @@ class Cache {
         }
         let clone = _.cloneDeep(object);
         let type = clone['__typename']
-        for(let key in object){
-            if(key === '__typename'){
+        for (let key in object) {
+            if (key === '__typename') {
                 continue
             }
             let value = object[key];
-            if(value instanceof Object){
+            if (value instanceof Object) {
                 let conflict = this.keyConflict.get(key);
-                if(value.nodes){
-                    if(conflict){
-                        clone[key] = this.formatObject(value, false, {type:conflict, uid:[clone[UID]]})
-                    }else{
-                        clone[this.getChildType(value)] = this.formatObject(value, false, {type:type, uid:[clone[UID]]})
+                if (value.nodes) {
+                    if (conflict) {
+                        clone[key] = this.formatObject(value, false, {
+                            type: conflict,
+                            uid: [clone[UID]]
+                        })
+                    } else {
+                        clone[this.getChildType(value)] = this.formatObject(value, false, {
+                            type: type,
+                            uid: [clone[UID]]
+                        })
                         delete clone[key]
                     }
-                }else{
-                    if(conflict){
-                        clone[key] = this.formatObject(value, false, {type:conflict, uid:[clone[UID]]})
-                    }else{
-                        clone[this.getChildType(value)] = this.formatObject(value, false, {type:type, uid:clone[UID]})
+                } else {
+                    if (this.cache[fieldType][this.cache[fieldName]]) {
+                        return this.cache[fieldType][this.cache[fieldName]]
+                    }
+                    if (conflict) {
+                        clone[key] = this.formatObject(value, false, {
+                            type: conflict,
+                            uid: [clone[UID]]
+                        })
+                    } else {
+                        clone[this.getChildType(value)] = this.formatObject(value, false, {
+                            type: type,
+                            uid: clone[UID]
+                        })
                         delete clone[key]
                     }
                 }
