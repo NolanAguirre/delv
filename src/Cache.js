@@ -4,14 +4,13 @@ import CacheEmitter from './CacheEmitter';
 const gql = require('graphql-tag')
 const util = require('util');
 var _ = require('lodash');
-var fs = require('fs');
 
-let UID = 'nodeId'
-
+let UID = 'id'
 
 class Cache {
     constructor() {
         this.cache = {};
+        this.emitter = CacheEmitter
         this.keyConflict = new Map();
         this.keyConflict.set('activityPrerequisitesByActivity', 'activityByActivity')
         this.keyConflict.set('activityByActivity', 'activityPrerequisitesByActivity')
@@ -20,6 +19,9 @@ class Cache {
     }
 
     resolver = (fieldName, root, args, context, info) => {
+        if(!root || Array.isArray(root) && root.length === 0){
+            return;
+        }
         if (info.isLeaf) {
             if (root.hasOwnProperty(fieldName)) {
                 return root[fieldName];
@@ -33,34 +35,39 @@ class Cache {
 
         let conflict = this.keyConflict.get(fieldName)
         let fieldType = typeMap.get(fieldName);
-        if (fieldType.endsWith('Connection')) {
+        if(fieldType.endsWith('Connection')){
             let childType = typeMap.guessChildType(fieldType);
+            if(!this.cache[childType]){
+                return {}
+            }
             let rootAccessor = childType
-            if (conflict) {
+            if(conflict){
                 rootAccessor = fieldName
             }
             let ids = root[rootAccessor];
-            if (ids instanceof Object) {
-                if (!Array.isArray(ids)) {
+            if(ids instanceof Object){
+                if(!Array.isArray(ids)){
                     ids = Object.keys(ids)
                 }
                 let intersection = this.filterCacheByIds(childType, ids);
-                if (args) {
+                if(args){
                     return this.filterCache(intersection, args)
                 }
                 return intersection;
             }
+            if(this.cache[childType])
             return this.cache[childType][ids]
-        } else {
-            if (this.cache[fieldType][this.cache[fieldName]]) {
+        }else if(this.cache[fieldType]){
+            if( this.cache[fieldType][this.cache[fieldName]]){
                 return this.cache[fieldType][this.cache[fieldName]]
             }
-            if (conflict) {
+            if(conflict){
                 return this.cache[fieldType][root[fieldName]]
-            } else {
+            }else{
                 return this.cache[fieldType][root[fieldType]]
             }
         }
+        return null;
 
     }
 
@@ -72,21 +79,30 @@ class Cache {
                 match = match && new Date(filterValue).getTime() >= new Date(value).getTime();
             } else if (key === 'greaterThanOrEqualTo') {
                 match = match && new Date(filterValue).getTime() <= new Date(value).getTime();
+            } else if (key === 'notEqualTo'){
+                match = match && value != filterValue
+            }else if(key === 'greaterThan'){
+                match = match && filterValue < value
+            }else if(key === 'lessThan'){
+                match = match && filterValue > value
+            }else{
+                console.log('cannot filter correctly')
             }
         }
         return match
     }
 
     filterCacheByIds = (type, ids) => {
-        return _.pickBy(this.cache[type], function(value, key) {
+        return _.pickBy(this.cache[type], (value, key) => {
             return ids.includes(key)
         });
     }
 
     filterCache = (set, args) => {
         let returnVal = set;
+        const _this = this;
         if (args.condition) {
-            returnVal = _.pickBy(returnVal, function(value, key) {
+            returnVal = _.pickBy(returnVal, (value, key) => {
                 let match = true;
                 for (let k in args.condition) {
                     if (value[k] !== args.condition[k]) {
@@ -97,13 +113,15 @@ class Cache {
             });
         }
         if (args.filter) {
-            returnVal = _.pickBy(returnVal, function(value, key) {
+            returnVal = _.pickBy(returnVal, (value, key) => {
                 let match = true;
                 for (let k in args.filter) {
                     if (value[k]) {
-                        if (!this.checkFilter(args.filter[k], value[k])) {
+                        if (!_this.checkFilter(args.filter[k], value[k])) {
                             match = false;
                         }
+                    }else{
+                        console.log(`Key data ${k} not found, cannot complete filter`);
                     }
                 }
                 return match;
@@ -135,9 +153,8 @@ class Cache {
             if (obj.length > 0) {
                 return obj[0]['__typename']
             }
-        } else {
-            return typeMap.guessChildType(obj['__typename'])
         }
+        return typeMap.guessChildType(obj['__typename'])
     }
 
     formatObject = (object, isRoot, parentObject) => {
@@ -158,14 +175,26 @@ class Cache {
                 this.cache[isRoot] = object[UID]
             }
             let clone = _.cloneDeep(object)
-            if (parentObject) {
-                clone[parentObject.type] = parentObject.uid
-            }
+            if(parentObject){
+                    let temp = clone[parentObject.type]
+                    if(temp){
+                        if(Array.isArray(temp)){
+                            clone[parentObject.type] = [...temp, parentObject.uid]
+                        }else{
+                            clone[parentObject.type] = [temp, parentObject.uid]
+                        }
+                    }else{
+                        clone[parentObject.type] = parentObject.uid
+                    }
+                }
             this.updateCacheValue(clone)
             return object[UID]
         }
 
         if (object['__typename'].endsWith('Connection')) {
+            if (!this.cache[this.getChildType(object)]) {
+                this.cache[this.getChildType(object)] = {}
+            }
             if (parentObject) {
                 parentObject['uid'] = parentObject['uid'][0]
             }
@@ -181,7 +210,6 @@ class Cache {
                 })
             }
         }
-
         let clone = _.cloneDeep(object);
         if(parentObject){
                 let temp = clone[parentObject.type]
@@ -194,43 +222,24 @@ class Cache {
                 }else{
                     clone[parentObject.type] = parentObject.uid
                 }
-        }
+            }
         let type = clone['__typename']
-        for (let key in object) {
-            if (key === '__typename') {
+        for(let key in object){
+            if(key === '__typename'){
                 continue
             }
             let value = object[key];
-            if (value instanceof Object) {
+            if(typeMap.get(key) === 'JSON'){
+                continue
+            }
+            if(value instanceof Object){
                 let conflict = this.keyConflict.get(key);
-                if (value.nodes) {
-                    if (conflict) {
-                        clone[key] = this.formatObject(value, false, {
-                            type: conflict,
-                            uid: [clone[UID]]
-                        })
-                    } else {
-                        clone[this.getChildType(value)] = this.formatObject(value, false, {
-                            type: type,
-                            uid: [clone[UID]]
-                        })
-                        delete clone[key]
-                    }
-                } else {
-                    if (conflict) {
-                        clone[key] = this.formatObject(value, false, {
-                            type: conflict,
-                            uid: [clone[UID]]
-                        })
-                    } else {
-                        clone[this.getChildType(value)] = this.formatObject(value, false, {
-                            type: type,
-                            uid: clone[UID]
-                        })
-                        delete clone[key]
-                    }
+                if(conflict){
+                    clone[key] = this.formatObject(value, false, {type:conflict, uid:[clone[UID]]})
+                }else{
+                    clone[this.getChildType(value)] = this.formatObject(value, false, {type:type, uid:[clone[UID]]})
+                    delete clone[key]
                 }
-
             }
         }
         this.updateCacheValue(clone)
@@ -254,6 +263,52 @@ class Cache {
         }
     }
 
+    removeObject = (obj) => {
+        let objType = obj['__typename']
+        let objUID = obj[UID]
+        CacheEmitter.changeType(objType)
+        delete this.cache[objType][objUID]
+        for(let key in obj){
+            let value = obj[key]
+            if(value instanceof Object){
+                let type = value['__typename']
+                let uid = value[UID];
+                let conflict = this.keyConflict.get(key)
+                CacheEmitter.changeType(type)
+                if(conflict){
+                    this.cache[type][uid][conflict] = this.cache[type][uid][conflict].filter(id=>id!=objUID)
+                }else{
+                    this.cache[type][uid][objType]= this.cache[type][uid][objType].filter(id=>id!=objUID)
+                }
+            }
+        }
+    }
+
+    remove = (queryResult) => {
+        for(let key in queryResult){
+            if(key === '__typename'){
+                continue
+            }
+            let value = queryResult[key]
+            if(value['__typename'].startsWith('Delete') || value['__typename'].startsWith('Remove') ){
+                for(let k in value){
+                    if(k === '__typename'){
+                        continue
+                    }
+                    this.removeObject(value[k])
+                }
+            }else if(value['__typename'].startsWith('Create') || value['__typename'].startsWith('Make')){
+                for(let k in value){
+                    if(k === '__typename'){
+                        continue
+                    }
+                    this.formatObject(value[k])
+                }
+            }
+        }
+        CacheEmitter.emitCacheUpdate();
+    }
+
     processIntoCache = (queryResult) => {
         let result = _.cloneDeep(queryResult)
         for (let key in result) {
@@ -261,12 +316,8 @@ class Cache {
                 this.formatObject(result[key], key)
             }
         }
-        //CacheEmitter.emitCacheUpdate();
-        fs.writeFile('cache.json', JSON.stringify(this.cache), 'utf8', (error) => {
-            if (error) {
-                console.log(error)
-            }
-        });
+        //console.log('emitting cache update')
+        CacheEmitter.emitCacheUpdate();
     }
 
     loadQuery = (query) => {
@@ -274,7 +325,7 @@ class Cache {
             return graphql(this.resolver, gql `${query}`, this.cache)
         } catch (error) {
             return {
-                error: error.message
+                error: 'error loading query' + error.message
             }
         }
     }
@@ -285,20 +336,3 @@ class Cache {
 }
 
 export default new Cache();
-
-
-// {
-//   "data": {
-//     "deleteActivityPrerequisiteById": {
-//       "activityPrerequisite": {
-//         "nodeId": "WyJhY3Rpdml0eV9wcmVyZXF1aXNpdGVzIiwiNDkxM2ZlMWYtMDhlMS00Y2YzLWI4NjMtY2U3NmZmMTY1MmEyIl0=",
-//         "activityByActivity": {
-//           "nodeId": "WyJhY3Rpdml0aWVzIiwiMDZkNzFiYTUtMjQ1MC00Mjk2LTg2YzMtMjhmMjNiN2Q2YjBkIl0="
-//         },
-//         "activityByPrerequisite": {
-//           "nodeId": "WyJhY3Rpdml0aWVzIiwiZGMyOTA5MDUtZTRmYy00ODFiLWI2YzgtOWFjOGU4ZjRjNzk2Il0="
-//         }
-//       }
-//     }
-//   }
-// }

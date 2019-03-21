@@ -1,11 +1,12 @@
 import Delv from './delv'
 import graphql from 'graphql-anywhere'
 import TypeMap from './TypeMap'
+import CacheEmitter from './CacheEmitter';
 const gql = require('graphql-tag')
 var _ = require('lodash');
 
 class Query {
-    constructor({query, variables, networkPolicy, onFetch, onResolve, onError}) {
+    constructor({query, variables, networkPolicy, onFetch, onResolve, onError, formatResult}) {
         this.q = query
         this.variables = variables
         this.networkPolicy = networkPolicy || 'network-once'
@@ -13,9 +14,12 @@ class Query {
         this.resolve = onResolve
         this.error = onError
         this.resolved = true
+        this.format = formatResult
         this.id = '_' + Math.random().toString(36).substr(2, 9)
         this.types = [];
-        this.mapTypes()
+        if(networkPolicy != 'network-no-cache' && networkPolicy != 'cache-by-query'){
+            this.mapTypes()
+        }
     }
 
     mapTypes = () => {
@@ -49,7 +53,11 @@ class Query {
 
     onResolve = (data) => {
         if(this.resolve){
-            this.resolve(data)
+            if(this.format){
+                this.resolve(this.format(data))
+            }else{
+                this.resolve(data)
+            }
         }
         this.resolved = true;
     }
@@ -60,6 +68,11 @@ class Query {
         }else{
             throw new Error(`Unhandled Error in Delv Query component: ${error.message}`)
         }
+    }
+    removeListeners = () => {
+        this.submit = null
+        this.fetch = null
+        this.resolve = null
     }
 
     onCacheUpdate = (types) => {

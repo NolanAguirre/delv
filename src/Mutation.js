@@ -3,14 +3,14 @@ import Cache from './Cache'
 
 
 class Mutation{
-    constructor({mutation, onFetch, onSubmit, onResolve, onError, refetchQueries, isDelete}){
+    constructor({mutation, networkPolicy, onFetch, onSubmit, onResolve, refetchQueries, customCache}){
         this.mutation = mutation;
+        this.networkPolicy = networkPolicy;
         this.submit = onSubmit;
         this.fetch = onFetch;
         this.resolve = onResolve
-        this.error = onError
+        this.customCache = customCache
         this.refetchQueries = refetchQueries || []
-        this.isDelete = isDelete
     }
 
     onSubmit = (event) => {
@@ -30,9 +30,6 @@ class Mutation{
         if(this.resolve){
             this.resolve(data)
         }
-        if(this.isDelete){
-            Cache.remove(data)
-        }
         this.refetchQueries.forEach((query)=>{
             Delv.query({
                 query:query,
@@ -45,24 +42,22 @@ class Mutation{
         })
     }
 
-    onError = (error) => {
-        if(this.error){
-            this.error(error)
-        }else{
-            throw new Error(`Unhandled Error in Delv Mutation component: ${error.message}`)
-        }
+    removeListeners = () => {
+        this.submit = null
+        this.fetch = null
+        this.resolve = null
     }
-    
+
     query = () => {
         Delv.query({
             query: this.mutation,
             variables: this.variables,
-            networkPolicy: 'network-only',
+            networkPolicy: this.networkPolicy || 'network-only',
             onFetch: this.onFetch,
-            onResolve: this.onResolve
+            onResolve: this.onResolve,
+            customCache: this.customCache
         })
     }
-
 }
 
 
