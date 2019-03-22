@@ -8,31 +8,38 @@ class QueryManager{
     }
 
     normalizeQuery = (query, variables)  => {
-        return `${query}${JSON.stringify(variables)}`.replace(/(\s)+/g, '');
+        return `${query}${JSON.stringify(variables)}`.replace(/(\s)+/g, '')
     }
 
     add = (query, variables) => {
-        let normalized = this.normalizeQuery(query, variables)
-        if(!this.includes(query, variables)){
+        const normalized = this.normalizeQuery(query, variables)
+        if(!this.includes(null, null, normalized)){
+            const id = Math.random().toString(36).substr(2, 9)
             this.queries[normalized] = {
                 promise:null,
-                id: Math.random().toString(36).substr(2, 9)
+                id
             }
+            return id;
         }
+        return this.queries[normalized].id
     }
-
-    includes = (query, variables) => {
-         return this.queries[this.normalizeQuery(query, variables)]
+    includes = (query, variables, normalized) => {
+         return this.queries[normalized || this.normalizeQuery(query, variables)]
     }
 
     getPromise = (query, variables) => {
-        if(this.includes(query,variables)){
-            return this.queries[this.normalizeQuery(query, variables)].promise
+        const normalized = this.normalizeQuery(query, variables)
+        if(this.includes(null, null, normalized)){
+            return this.queries[normalized].promise
         }
         return null
     }
     setPromise = (query, variables, promise) => {
-        this.queries[this.normalizeQuery(query, variables)].promise = promise
+        const normalized = this.normalizeQuery(query, variables)
+        promise.finally(()=>{
+            this.queries[normalized].promise = null
+        })
+        this.queries[normalized].promise = promise
     }
 
 }

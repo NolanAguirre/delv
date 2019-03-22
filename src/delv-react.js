@@ -17,8 +17,18 @@ class ReactQuery extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            queryResult: '',
             loading:true
+        }
+    }
+
+    componentDidMount = () => {
+        this.resetProps()
+    }
+
+    resetProps = () => {
+        if(this.query){
+            this.query.removeCacheListener();
+            this.query.removeListeners();
         }
         this.query = new Query({
             query: this.props.query,
@@ -27,15 +37,13 @@ class ReactQuery extends Component {
             onFetch:this.onFetch,
             onResolve: this.onResolve,
             onError:this.onError,
-            formatResult:props.formatResult
+            cacheProcess:this.props.cacheProcess,
+            formatResult:this.props.formatResult
         })
-    }
-
-    componentDidMount = () => {
-        this.query.query();
-        if (!(this.query.networkPolicy === 'network-only' || this.query.networkPolicy === 'network-no-cache')) {
+        if (this.query.networkPolicy === 'network-only') {
             this.query.addCacheListener();
         }
+        this.query.query();
     }
 
     componentWillUnmount = () => {
@@ -45,32 +53,19 @@ class ReactQuery extends Component {
 
     componentDidUpdate = (prevProps, prevState, snapshot) => {
         if (prevProps.query != this.props.query) {
-            this.query.removeCacheListener();
-            this.query = new Query({
-                query: this.props.query,
-                variables: this.props.variables,
-                networkPolicy:this.props.networkPolicy,
-                onFetch:this.onFetch,
-                onResolve: this.onResolve,
-                onError:this.onError,
-                formatResult:this.props.formatResult
-            })
-            if (!(this.query.networkPolicy === 'network-only' || this.query.networkPolicy === 'network-no-cache')) {
-                this.query.addCacheListener();
-            }
-            this.query.query();
+            this.resetProps()
         }
     }
 
-    shouldComponentUpdate(nextProps, nextState){
-        if(this.state === nextState && nextProps.query === this.props.query){
-            return false
-        }
-        if(this.state.queryResult === '' && nextState.queryResult === '' && nextProps.loading == this.props.loading){
-            return false
-        }
-        return true
-    }
+    // shouldComponentUpdate(nextProps, nextState){ TODO Figure out if this is needed
+    //     if(this.state === nextState && nextProps.query === this.props.query){
+    //         return false
+    //     }
+    //     if(this.state.queryResult === '' && nextState.queryResult === '' && nextProps.loading == this.props.loading){
+    //         return false
+    //     }
+    //     return true
+    // }
 
     onFetch = (promise) => {
         this.setState({loading:true})
@@ -89,6 +84,8 @@ class ReactQuery extends Component {
     onError = (error) => {
         if(this.props.onError){
             this.props.onError(error)
+        }else{
+            this.setState({error:error.error, loading:false})
         }
     }
 
@@ -101,6 +98,7 @@ class ReactQuery extends Component {
             onResolve,
             onError,
             formatResult,
+            cacheProcess,
             children,
             ...otherProps
         } = this.props
@@ -112,9 +110,15 @@ class ReactQuery extends Component {
                 <img alt='Loading' className='loading-icon center-x' src={loadingIcon} />
             </div>
         }
-        return React.cloneElement(this.props.children, {
-            ...this.state.queryResult, ...otherProps
-        })
+        if(this.state.error){ //TODO make this better too
+            return React.cloneElement(this.props.children, {
+                ...this.state.error, ...otherProps
+            })
+        }else{
+            return React.cloneElement(this.props.children, {
+                ...this.state.queryResult, ...otherProps
+            })
+        }
     }
 }
 

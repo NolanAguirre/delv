@@ -1,4 +1,3 @@
-
 import util from 'util'
 import TypeMap from './TypeMap'
 import axios from 'axios'
@@ -8,15 +7,19 @@ axios.defaults.withCredentials = true;
 
 class Delv {
     constructor() {
-        this.queries = new QueryManager();
-        TypeMap.loadTypes();
-        this.isReady = true
+        this.queries = new QueryManager()
+        this.isReady = false
         this.queuedQueries = []
     }
-    config = ({url, handleError}) => {
+    config = ({url, handleError, development}) => {
         this.url = url
         this.handleError = handleError
-        //this.loadIntrospection() //development purposes
+        if(development){
+            this.loadIntrospection()
+        }else{
+            this.isReady = true
+            TypeMap.loadTypes()
+        }
     }
 
     loadIntrospection = () => { //development purposes
@@ -48,8 +51,20 @@ class Delv {
     onReady = () => {
         this.isReady = true;
         this.queuedQueries.forEach((query)=>{
-            this.queryHttp(query.options, query.skipCache, query.returnRes)
+            this.queryHttp(query)
         })
+        this.queuedQueries = undefined
+    }
+
+    getCacheData = (query, variables, queryId, cacheProcess) => {
+        switch(cacheProcess){ //update, delete and skip all return the raw res data, they are used for mutations and are mainly made via network-only
+            case 'default':
+                return cache.loadQuery(query, variables)
+            case 'query':
+                return cache.loadByQuery(queryId)
+            default:
+                return false
+        }
     }
 
     post = (query, variables) => {
@@ -59,40 +74,62 @@ class Delv {
         })
     }
 
-    queryHttp = ({query, variables, onFetch, onResolve, onError, customCache}, skipCache, returnRes) => {
+    queryHttp = ({query, variables, onFetch, onResolve, onError, cacheProcess}) => {
         if(!this.isReady){
-            this.queuedQueries.push({options:{query, variables, onFetch, onResolve, onError, customCache}, skipCache, returnRes})
+            this.queuedQueries.push({query, variables, onFetch, onResolve, onError, cacheProcess})
         }
-        this.queries.add(query, variables) //TODO add typenames on only some queries
+        const queryId = this.queries.add(query, variables) //TODO add typenames on only some queries
         let promise = this.post(this.queries.addTypename(query), variables).then((res) => {
-            this.queries.setPromise(query, variables, null);
-            if(skipCache){
-                onResolve(res.data)
-                return res;
+            if(res.data.errors){
+                onError(res.data.errors)
             }else{
                 try{
-                    if(customCache){
-                        customCache(cache, res.data.data)
-                    }else{
-                        cache.processIntoCache(res.data.data)
+                    switch(cacheProcess){
+                        case 'default':
+                            cache.processIntoCache(res.data.data)
+                            break
+                        case 'query':
+                            //cache.processByQuery
+                            break
+                        case 'update':
+                            //cache.processUpdate
+                            break
+                        case 'delete':
+                            //cache.processDelete
+                            break
+                        case 'skip':
+                            //do nothing
+                            break
+                        default:
+                            cacheProcess(cache, res.data.data)
                     }
                 } catch(error) {
+                    //TODO improve error message to highlight what went wrong
                     console.trace()
-                    console.log(`Error occured trying to cach responce data: ${error.message}`)
+                    console.log(`Error occured trying to cache responce data: ${error.message}`)
                 }
-                if(returnRes){
-                    onResolve(res.data.data)
-                }else{
-                    onResolve(cache.loadQuery(query))
-                }
-                return res;
             }
-
+            return res;
+        }).then((res) => {
+            if(!res.data.errors){
+                try{
+                    const data = this.getCacheData(query, variables, queryId, cacheProcess)
+                    if(data){
+                        onResolve(data)
+                    }else{
+                        onResolve(res.data.data)
+                    }
+                }catch(error){
+                    console.trace()
+                    console.log('Error occured while tryin.g to load data from query'error.message)
+                    onResolve(res.data.data)
+                }
+            }
+            return res
+        }).catch((error) => {
+            throw new Error(`Error occured while http request ${error.message}`);
+            return
         })
-        //.catch((error) => {
-            //throw new Error(`Error occured while making query ${error.message}`);
-        //    return;
-        //})
         onFetch(promise);
         this.queries.setPromise(query, variables, promise)
     }
@@ -106,55 +143,37 @@ class Delv {
                 options.onResolve(cache.loadQuery(options.query))
                 break
             case 'network-only':
-                this.queryHttp(options, false, true) // query, variables, onFetch, onResolve, onError
-                break
-            case 'network-no-cache':
-                this.queryHttp(options, true)
+                this.queryHttp(options) // query, variables, onFetch, onResolve, onError
                 break
             case 'network-once':
                 this.networkOnce(options)
                 break
-            case 'cache-by-query':
-                this.cacheByQuery(options)
-                break
-        }
-    }
-
-    cacheByQuery = (options) => {
-        let query = this.queries.includes(options.query, options.variables)
-        if(query){
-            options.onResolve(cache.cache[query.id])
-        }else{
-            this.queries.add(options.query, options.variables)
-            query = this.queries.includes(options.query, options.variables)
-            this.queryHttp({...options, customCache:(cache, data)=>{
-                cache.cache[query.id] = data;
-            }}, false, true)
         }
     }
 
     cacheFirst = (options) => {
-        let data = cache.loadQuery(options.query)
-        if (data.data) {
-            options.onResolve(data.data);
+        let cacheData = this.getCacheData(options.query, options.variables, null, options.cacheProcess)
+        if (cacheData.data) {
+            options.onResolve(cacheData.data);
         } else {
-            this.queryHttp(options) // query, variables, onFetch, onResolve, onError
+            this.queryHttp(options)
         }
     }
 
-    networkOnce = ({query, variables, onFetch, onResolve, onError, customCache}) => {
-        if(this.queries.includes(query, variables)){
-            let promise = this.queries.getPromise(query, variables)
-            if(promise){
-                promise.then((res) => {
+    networkOnce = ({query, variables, onFetch, onResolve, onError, cacheProcess}) => {
+        const storedQuery = this.queries.includes(query, variables)
+        if(storedQuery){
+            if(storedQuery.promise){
+                storedQuery.promise.then((res) => {
                     onResolve(res.data.data)
                     return res;
                 })
             }else{
-                onResolve(cache.loadQuery(query))
+                const cacheData = this.getCacheData(query, variables, storedQuery.id, cacheProcess)
+                onResolve(cacheData)
             }
         }else{
-            this.queryHttp({query, variables, onFetch, onResolve, onError, customCache})
+            this.queryHttp({query, variables, onFetch, onResolve, onError, cacheProcess})
         }
     }
 
