@@ -5,7 +5,7 @@ class CacheEmitter extends EventEmitter{
         super();
         this.changedTypes = [];
     }
-    changeType = (type) => {
+    updateType = (type) => {
         if(!this.changedTypes.includes(type)){
             this.changedTypes.push(type);
         }
@@ -17,6 +17,5 @@ class CacheEmitter extends EventEmitter{
         })
         this.changedTypes = [];
     }
-
 }
-export default new CacheEmitter()
+export default CacheEmitter
