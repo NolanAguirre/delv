@@ -1,67 +1,47 @@
 class StoreType{
     constructor(){
-        this.store = new Map();
+        this.store = new Object({}, null)
     }
 
-    get = (key) => {
-        return this.store.get(key)
-    }
+    get = (key) => this.store[key]
 
-    set = (key, value) => {
-        this.store.set(key, value)
-    }
+    set = (key, node) => this.store[key] = node
 
-    delete = (key) => {
-        this.store.delete(key)
-    }
+    delete = (key) => this.store[key] = null
 
-    merge = (key, value) => {
-        const oldValue = this.store.get(key)
-        this.store.set(key,  {...oldValue, ...value})
-    }
+    merge = (key, node) => this.store[key] = {...this.store[key], ...node}
 
-    toString = () => {
-        let printValue = {}
-        for(let [key, value] of this.store){
-            printValue[key] = value
-        }
-        return printValue
-    }
+    getValues = () => Object.values(this.store)
+
+    toString = () => this.store
 }
 
 
 class InMemoryStore{
     constructor(){
-        this.store = new Map();
+        this.store = new Object({}, null)
     }
 
-    getAbsolute = (id) => {
-        return this.store.get(id)
-    }
+    clear = () => this.store = new Object({}, null)
 
-    setAbsolute = (id, node) => {
-        this.store.set(id, node)
-    }
+    getAbsolute = (id) => this.store[id]
 
-    deleteAbsolute = (id) => {
-        this.store.delete(id)
-    }
+    setAbsolute = (id, node) => this.store[id] = node
 
-    get = (id, type, node) => {
-        if(this.store.has(type)){
-            const storeType = this.store.get(type)
-            storeType.get(id)
-        }
+    deleteAbsolute = (id) => this.store.delete(id)
+
+    get = (type) => {
+        return this.store[type]
     }
 
     set = (id, type, node) => {
-        if(this.store.has(type)){
-            let storeType = this.store.get(type)
+        let storeType = this.store[type]
+        if(storeType){
             storeType.set(id, node)
         }else{
-            let storeType = new StoreType()
+            storeType = new StoreType()
             storeType.set(id, node)
-            this.store.set(type, storeType)
+            this.store[type] = storeType
         }
     }
 
@@ -70,20 +50,23 @@ class InMemoryStore{
     }
 
     merge = (id, type, node) => {
-        if(this.store.has(type)){
-            let storeType = this.store.get(type)
+        let storeType = this.store[type]
+        if(storeType){
             storeType.merge(id, node)
         }else{
-            let storeType = new StoreType()
+            storeType = new StoreType()
             storeType.set(id, node)
-            this.store.set(type, storeType)
+            this.store[type] = storeType
         }
     }
 
     toString = () => {
         let printValue = {}
-        for(let [key, value] of this.store){
-            printValue[key] = value.toString()
+        for(let key in this.store){
+            const value = this.store[key]
+            if(value){
+                printValue[key] = value.toString()
+            }
         }
         return printValue
     }
