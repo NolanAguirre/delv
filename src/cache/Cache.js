@@ -9,7 +9,7 @@ class Cache {
     }
 
     loadPolicies = (policies) => {
-        this.policies = new Object({}, null)
+        this.policies = Object.create(null)
         policies.forEach(process => {
             this.policies[process.name] = {
                 read:process.read,

@@ -1,6 +1,6 @@
 class StoreType{
     constructor(){
-        this.store = new Object({}, null)
+        this.store = Object.create(null)
     }
 
     get = (key) => this.store[key]
@@ -19,10 +19,10 @@ class StoreType{
 
 class InMemoryStore{
     constructor(){
-        this.store = new Object({}, null)
+        this.store = Object.create(null)
     }
 
-    clear = () => this.store = new Object({}, null)
+    clear = () => this.store = Object.create(null)
 
     getAbsolute = (id) => this.store[id]
 
