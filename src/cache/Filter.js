@@ -1,3 +1,3 @@
-export default = ({filter, value, cache}) => {
+module.exports = ({filter, value, cache}) => {
 
 }

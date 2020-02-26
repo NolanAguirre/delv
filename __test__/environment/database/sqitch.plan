@@ -1,0 +1,4 @@
+%syntax-version=1.0.0
+%project=delv-test
+
+v1 2020-02-26T23:20:08Z Nolan Aguirre <nolan@nolan> # Add tables required for testing delv

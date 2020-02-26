@@ -1,19 +1,36 @@
+class CacheFirst {
+    constructor({cache, network, queryManager}){
+        this.cache = cache
+        this.network = network
+        this.queryManager = queryManager
+    }
+    getName = () => 'cache-first'
 
-export default {
-    name:'cache-first',
-    policy:({
-        query,
-        variables,
-        cacheProcess,
-        cache,
-        network,
-        queryManager
-    }) => {
+    process = async ({query, variables, queryId, cacheProcess}) => {
+        const queryObj = this.queryManager.get({query, variables})
+        if(queryObj.isPending){
+            return queryObj.promise
+        }
         try{
-            return cache.read(query, variables, cacheProcess)
-        } catch(error) {
-            queryManager.add(query, variables)
-            return network.post({query, variables})
+            return this.cache.read({cacheProcess, query, variables})
+        } catch {
+            queryObj.isPending = true
+            this.network.post({query, variables})
+            .then((res)=>{
+                this.cache.write({cacheProcess, data:res.data, ...other})
+                queryObj.isPending = false
+                queryObj.success = true
+                return res.data.data
+            }).catch((error)=>{
+                queryObj.isPending = false
+                queryObj.fail = true
+                return error
+            })
+            return queryObj.promise
         }
     }
 }
+
+
+
+export default CacheFirst

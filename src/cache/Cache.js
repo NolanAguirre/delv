@@ -1,53 +1,58 @@
 let UID = 'id'
 
-class Cache {
-    constructor({storage, cachePolicies, typeMap, emitter}) {
-        this.storage = storage
-        this.loadPolicies(cachePolicies)
-        this.typeMap = typeMap
-        this.emitter = emitter
-    }
+function Cache({storage, cacheProcesses, typeMap, emitter}) {
+    const process = Object.create(null)
 
-    loadPolicies = (policies) => {
-        this.policies = Object.create(null)
-        policies.forEach(process => {
-            this.policies[process.name] = {
-                read:process.read,
-                write:process.write
-            }
+    cacheProcesses.forEach(process => {
+        const policy = new process({
+            storage,
+            typeMap,
+            emitter
         })
+        process[policy.getName()] = policy
+    })
 
+    const read = ({cacheProcess, ...other}) => {
+        if(cacheProcess instanceof Function){
+            return cacheProcess({
+                storage,
+                typeMap,
+                emitter,
+                ...other
+            })
+        }else{
+            return process[cacheProcess].read(other)
+        }
     }
 
-    read = ({cachePolicy, ...other}) => {
-        return this.policies[cachePolicy].read({
-            ...other,
-            storage:this.storage,
-            emitter:this.emitter,
-            typeMap:this.typeMap
-        })
+    const write = ({cacheProcess, ...other}) => {
+        if(cacheProcess instanceof Function){
+            cacheProcess({
+                storage,
+                typeMap,
+                emitter,
+                ...other
+            })
+        }else{
+            process[cacheProcess].write(other)
+        }
     }
 
-    write = ({cachePolicy, ...other}) => {
-        this.policies[cachePolicy].write({
-            ...other,
-            storage:this.storage,
-            emitter:this.emitter,
-            typeMap:this.typeMap
-        })
-    }
+    const clear = storage.clear
 
-    clear = () => {
-        this.storage.clear()
-    }
-
-
-    toString = () => {
+    const toString = () => {
         let printValue = {
-            storage:this.storage.toString()
+            storage:storage.toString()
         }
         return printValue
     }
+
+    return {
+        read,
+        write,
+        clear,
+        toString
+    }
 }
 
-export default Cache
+module.exports = Cache

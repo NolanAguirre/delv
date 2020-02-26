@@ -1,36 +1,29 @@
-import Delv from './delv'
-import Cache from './Cache'
+const Delv = require('./delv')
+const Cache = require('./Cache')
 
 
-class Mutation{
-    constructor({mutation, refetchQueries, cacheProcess = 'defualt'}){
-        this.mutation = mutation
-        this.networkPolicy = networkPolicy
-        this.cacheProcess = cacheProcess
-        this.refetchQueries = refetchQueries || []
-    }
-
-    submit = (variables) => {
+function Mutation({mutation, refetchQueries, cacheProcess = 'defualt'}){
+    const submit = (variables) => {
         return new Promise((resolve, reject) =>{
             Delv.query({
-                query: this.mutation,
+                query: mutation,
                 variables,
                 networkPolicy: 'network-only',
-                cacheProcess: this.cacheProcess
+                cacheProcess
             })
             .then((data)=>{
-                this.onResolve(data)
+                onResolve(data)
                 resolve(data)
             })
             .catch((error)=>{
-                this.onError(error)
+                onError(error)
                 reject(error)
             })
         })
     }
 
-    onResolve = (data) => {
-        this.refetchQueries.forEach((query)=>{
+    const onResolve = (data) => {
+        refetchQueries.forEach((query)=>{
             Delv.query({
                 query:query.query,
                 networkPolicy:query.networkPolicy || 'network-only',
@@ -42,9 +35,13 @@ class Mutation{
         })
     }
 
-    onError = (error) => {
+    const onError = (error) => {
         console.log('Error occured durring mutation')
+    }
+
+    return {
+        submit
     }
 }
 
-export default Mutation
+module.exports = Mutation

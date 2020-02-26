@@ -1,12 +1,11 @@
 import React, {Component} from 'react'
 import graphql from 'graphql-anywhere'
-import TypeMap from './TypeMap'
 import Delv from './delv'
 import Query from './Query'
 
 class Query extends Component {
     constructor(props) {
-        super(props);
+        super(props)
         this.state = {
             loading:true
         }
@@ -52,13 +51,6 @@ class Query extends Component {
             return false
         }
         return true
-    }
-
-    onFetch = (promise) => {
-        this.setState({loading:true})
-        if(this.props.onFetch){
-            this.props.onFetch(promise)
-        }
     }
 
     onResolve = (data) => {

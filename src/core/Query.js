@@ -1,44 +1,40 @@
-import Delv from './delv'
-import graphql from 'graphql-anywhere'
-import TypeMap from './TypeMap'
-import CacheEmitter from './CacheEmitter';
-import _ from 'lodash'
-import gql from 'graphql-tag'
+import Delv from './delv.js'
 
 
 class Query {
-    constructor({query, variables, networkPolicy = 'network-once', cacheProcess = 'type'}) {
+    constructor({query, variables, networkPolicy, cacheProcess}) {
         this.q = query
         this.variables = variables
-        this.resolved = true
-        this.format = format
         this.id = '_' + Math.random().toString(36).substr(2, 9)
         this.types = []
-        this.networkPolicy = networkPolicy || 'network-once'
-        this.cacheProcess = cacheProcess || 'default'
-        if(this.networkPolicy !== 'network-only'){
-            this.mapTypes()
-        }
-        this.checkPolicies()
-    }
-    
-    mapTypes = () => {
-
+        this.networkPolicy = networkPolicy
+        this.cacheProcess = cacheProcess
+        this.resolved = true
     }
 
     query = () => {
+        this.resolved = false
         return Delv.query({
             query: this.q,
-            variables: this.variables
+            variables: this.variables,
+            networkPolicy:this.networkPolicy,
+            cacheProcess:this.cacheProcess
+        }).then((data)=>{
+            this.resolved = true
+            return data
         })
     }
 
+    mapTypes = () => {
+        this.types = Delv.typeMap.getTypes(this.q)
+    }
+
     addCacheListener = () => {
-        CacheEmitter.on(this.id, this.onCacheUpdate)
+        Delv.cacheEmitter.on(this.id, this.onCacheUpdate)
     }
 
     removeCacheListener = () => {
-        CacheEmitter.removeAllListeners(this.id);
+        Delv.cacheEmitter.removeAllListeners(this.id);
     }
 
     onCacheUpdate = (types) => {

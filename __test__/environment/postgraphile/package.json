@@ -1,0 +1,14 @@
+{
+  "name": "delv-test",
+  "version": "1.0.0",
+  "description": "A postgraphile instance to test delv against",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nolan Aguirre",
+  "license": "ISC",
+  "dependencies": {
+    "postgraphile": "^4.5.5"
+  }
+}

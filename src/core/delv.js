@@ -1,34 +1,39 @@
-import TypeMap from './TypeMap'
-import cache from './Cache'
-import QueryManager from './QueryManager'
+function Delv({cache, queryManager, network, networkPolicies}) {
+    const queuedQueries = []
 
-class Delv {
-    constructor({cache, queryManager, network, networkPolicies}) {
-        this.cache = cache
-        this.queryManager = queryManager
-        this.network = network
-        this.networkPolicies = networkPolicies({query:network.query, cache:this.cache})
-        this.queuedQueries = []
+    const init = () => {
+        setupNetworkPolicies(networkPolicies)
     }
 
-    query = ({networkPolicy, ...other}}) => {
-        return this.networkPolicies[networkPolicy]({
-            ...other,
-            network:this.network,
-            cache:this.cache,
-            queryManager:this.queryManager
-        }).then((data) => {
-            this.cache[cacheProcess](other)
-            return data
-        }).catch((error) => {
-            throw error
+    const setupNetworkPolicies = (policies) => {
+        policies = Object.create(null)
+        policies.forEach(process => {
+            const policy = new process({
+                cache,
+                queryManager,
+                network
+            })
+            policies[policy.getName()] = policy
         })
     }
 
-    reset = () => {
-        this.queryManager.clear();
-        this.cache.clear();
+    const query = async ({networkPolicy, query, variables, ...other}) => {
+        return await policies[networkPolicy].process({
+            ...other,
+            query,
+            variables
+        })
+    }
+
+    const reset = () => {
+        queryManager.clear();
+        cache.clear();
+    }
+    return {
+        init,
+        query,
+        reset
     }
 }
 
-export default new Delv();
+module.exports = Delv

@@ -4,35 +4,33 @@ import _ from 'lodash'
 
 const allowedTypes = Object.keys(WSEvents)
 
-class DelvWebSocket{
-    constructor(url){
-        this.url = url || `wss://${window.location.host}/wss/v1/`
-        this.ready = false
-        this.subscribedTo = {}
-        this.queue = []
-    }
+function DelvWebSocket(){
+    let url = url
+    let ready = false
+    let subscribedTo = {}
+    let queue = []
 
-    connect = () => {
-        if(!this.ws){
-            this.ws = new WebSocket(this.url)
-            this.ws.onopen = this.onOpen
-            this.ws.onmessage = this.onMessage
-            this.ws.onclose = this.onClose
+    const connect = () => {
+        if(!ws){
+            ws = new WebSocket(url)
+            ws.onopen = onOpen
+            ws.onmessage = onMessage
+            ws.onclose = onClose
         }
     }
 
-    disconnect = () => {
-        if(this.ws){
-            this.ws.close()
+    const disconnect = () => {
+        if(ws){
+            ws.close()
         }
     }
 
-    subscribe = ({type, ids}) => {
+    const subscribe = ({type, ids}) => {
         if(allowedTypes.includes(type)){
-            if(this.ready){
+            if(ready){
                 let newId = false
-                if(this.subscribedTo[type]){
-                    let currentIds = this.subscribedTo[type]
+                if(subscribedTo[type]){
+                    let currentIds = subscribedTo[type]
                     ids.forEach((id)=>{
                         if(!currentIds.includes(id)){
                             newId = true
@@ -41,17 +39,17 @@ class DelvWebSocket{
                     })
                 }else{
                     newId = true
-                    this.subscribedTo[type] = ids
+                    subscribedTo[type] = ids
                 }
                 if(newId){
-                    this.ws.send(JSON.stringify({
+                    ws.send(JSON.stringify({
                         type:'subscribe',
                         table:type,
                         ids
                     }))
                 }
             }else{
-                this.queue.push({
+                queue.push({
                     method:'subscribe',
                     data:{
                         type,
@@ -64,13 +62,13 @@ class DelvWebSocket{
         }
     }
 
-    unsubscribe = ({type, ids}) => {
-        if(this.ready){
-            if(this.subscribedTo[type]){
-                const newSubcribedTo = this.subscribedTo[type].filter((item)=>!ids.includes(item))
-                if(newSubcribedTo.length !== this.subscribedTo.length){
-                    this.subscribedTo = newSubcribedTo
-                    this.ws.send(JSON.stringify({
+    const unsubscribe = ({type, ids}) => {
+        if(ready){
+            if(subscribedTo[type]){
+                const newSubcribedTo = subscribedTo[type].filter((item)=>!ids.includes(item))
+                if(newSubcribedTo.length !== subscribedTo.length){
+                    subscribedTo = newSubcribedTo
+                    ws.send(JSON.stringify({
                         type:'unsubscribe',
                         table:type,
                         ids
@@ -78,7 +76,7 @@ class DelvWebSocket{
                 }
             }
         }else{
-            this.queue.push({
+            queue.push({
                 method:'unsubscribe',
                 data:{
                     type,
@@ -88,22 +86,22 @@ class DelvWebSocket{
         }
     }
 
-    onOpen = () => {
+    const onOpen = () => {
         console.log('connected')
-        this.ready = true
-        this.queue.forEach((item)=>{
+        ready = true
+        queue.forEach((item)=>{
             switch(item.method){
                 case 'subscribe':
-                    this.subscribe(item.data)
+                    subscribe(item.data)
                     break
                 case 'unsubscribe':
-                    this.unsubscribe(item.data)
+                    unsubscribe(item.data)
                     break
             }
         })
     }
 
-    onMessage = (message) => {
+    const onMessage = (message) => {
         const data = JSON.parse(message.data)
         const queryInfo = WSEvents[data.type]
         Delv.query({
@@ -116,8 +114,13 @@ class DelvWebSocket{
         })
     }
 
-    onClose = () => {
-        this.ready = false
+    const onClose = () => {
+        ready = false
+    }
+
+    return{
+        subscribe,
+        unsubscribe
     }
 }
 
