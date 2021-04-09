@@ -59,9 +59,7 @@ const INTROSPECTION_QUERY =
 
 function TypeMap({typeMap, api}) {
     let map
-
-
-
+    
     const parseDescription = (description) => {
         const descriptionType = description.match(/\`\S+\`/)
         if(descriptionType){

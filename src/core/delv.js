@@ -1,4 +1,9 @@
-function Delv({cache, queryManager, network, networkPolicies}) {
+function Delv({
+    cache,
+    queryManager,
+    network,
+    networkPolicies
+}) {
     const queuedQueries = []
 
     const init = () => {
@@ -29,6 +34,7 @@ function Delv({cache, queryManager, network, networkPolicies}) {
         queryManager.clear();
         cache.clear();
     }
+
     return {
         init,
         query,

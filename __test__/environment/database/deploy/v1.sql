@@ -2,6 +2,8 @@
 
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE SCHEMA delv;
 
 CREATE TABLE delv.book_categories( -- Use for table with a different pk than the others
@@ -11,7 +13,7 @@ CREATE TABLE delv.book_categories( -- Use for table with a different pk than the
 CREATE TABLE delv.books(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
-    category REFERENCES delv.book_categories(category)
+    category TEXT REFERENCES delv.book_categories(category)
 );
 
 CREATE TABLE delv.authors(
@@ -24,7 +26,7 @@ CREATE TABLE delv.libraries(
     name TEXT NOT NULL
 );
 
-CREATE TABLE delv.account(
+CREATE TABLE delv.accounts(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL
 );
@@ -43,7 +45,7 @@ CREATE TABLE delv.library_books(
 
 CREATE TABLE delv.library_accounts(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    library_id UUID REFERENCES delv.libraries(id)
+    library_id UUID REFERENCES delv.libraries(id),
     account_id UUID REFERENCES delv.accounts(id)
 );
 
@@ -51,8 +53,8 @@ CREATE TABLE delv.checkouts(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     book_id UUID REFERENCES delv.books(id),
     library_id UUID REFERENCES delv.libraries(id),
-    account_id UUID REFERENCES delv.accounts(id)
-    out_at TIMESTAMP DEFAULT NOW()
+    account_id UUID REFERENCES delv.accounts(id),
+    out_at TIMESTAMP DEFAULT NOW(),
     in_at TIMESTAMP,
     returned BOOLEAN DEFAULT FALSE
 );

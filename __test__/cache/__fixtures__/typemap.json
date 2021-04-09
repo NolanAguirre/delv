@@ -1,45 +1,85 @@
 {
-    "Query":{
-        "allBooks":"Book",
-        "allBookAuthors":"BookAuthor",
-        "allAuthors":"Author",
-        "allLibraryBooks":"LibraryBook",
-        "allLibraries":"Library",
-        "allLibraryUsers":"LibraryUser",
-        "allUsers":"User",
-        "allCheckous":"Checkout"
-    },
-    "Book":{
-        "bookAuthorByBookId":"BookAuthor",
-        "checkoutByBookId":"Checkout"
-    },
-    "BookAuthor":{
-        "bookByBookId":"Book",
-        "authorByAuthorId":"Author"
-    },
-    "Author":{
-        "bookAuthorByAuthorId":"BookAuthor"
-    },
-    "LibraryBook":{
-        "libraryByLibraryId":"Library",
-        "bookByBookId":"Book"
-    },
-    "Library":{
-        "libraryUserByLibraryId":"LibraryUser",
-        "libraryBookByLibraryId":"LibraryBook",
-        "checkoutByLibraryId":"Checkout"
-    },
-    "LibraryUser":{
-        "libraryByLibraryId":"Library",
-        "userByUserId":"User"
-    },
-    "User":{
-        "checkoutByUserId":"Checkout",
-        "libraryUserByUserId":"LibraryUser"
-    },
-    "Checkout":{
-        "bookByCheckoutId":"Book",
-        "libraryByCheckoutId":"Library",
-        "userByCheckoutId":"User"
-    }
+  "Query": {
+    "allAccountSyndicates": "AccountSyndicate",
+    "allAccounts": "Account",
+    "allAuthors": "Author",
+    "allBookAuthors": "BookAuthor",
+    "allBookCategories": "BookCategory",
+    "allBooks": "Book",
+    "allCheckouts": "Checkout",
+    "allLibraries": "Library",
+    "allLibraryAccounts": "LibraryAccount",
+    "allLibraryBooks": "LibraryBook",
+    "allOverdueFines": "OverdueFine",
+    "accountSyndicateById": "AccountSyndicate",
+    "accountById": "Account",
+    "authorById": "Author",
+    "bookAuthorById": "BookAuthor",
+    "bookCategoryByCategory": "BookCategory",
+    "bookById": "Book",
+    "checkoutById": "Checkout",
+    "libraryById": "Library",
+    "libraryAccountById": "LibraryAccount",
+    "libraryBookById": "LibraryBook",
+    "overdueFineById": "OverdueFine",
+    "accountSyndicate": "AccountSyndicate",
+    "account": "Account",
+    "author": "Author",
+    "bookAuthor": "BookAuthor",
+    "bookCategory": "BookCategory",
+    "book": "Book",
+    "checkout": "Checkout",
+    "library": "Library",
+    "libraryAccount": "LibraryAccount",
+    "libraryBook": "LibraryBook",
+    "overdueFine": "OverdueFine"
+  },
+  "AccountSyndicate": {
+    "accountByOwnerId": "Account",
+    "accountByAccountId": "Account"
+  },
+  "Account": {
+    "libraryAccountsByAccountId": "LibraryAccount",
+    "checkoutsByAccountId": "Checkout",
+    "accountSyndicatesByOwnerId": "AccountSyndicate",
+    "accountSyndicatesByAccountId": "AccountSyndicate"
+  },
+  "LibraryAccount": {
+    "libraryByLibraryId": "Library",
+    "accountByAccountId": "Account"
+  },
+  "Library": {
+    "libraryBooksByLibraryId": "LibraryBook",
+    "libraryAccountsByLibraryId": "LibraryAccount",
+    "checkoutsByLibraryId": "Checkout"
+  },
+  "LibraryBook": {
+    "bookByBookId": "Book",
+    "libraryByLibraryId": "Library"
+  },
+  "Book": {
+    "bookCategoryByCategory": "BookCategory",
+    "bookAuthorsByBookId": "BookAuthor",
+    "libraryBooksByBookId": "LibraryBook",
+    "checkoutsByBookId": "Checkout"
+  },
+  "BookCategory": {
+    "booksByCategory": "Book"
+  },
+  "BookAuthor": {
+    "bookByBookId": "Book",
+    "authorByAuthorId": "Author"
+  },
+  "Author": {
+    "bookAuthorsByAuthorId": "BookAuthor"
+  },
+  "Checkout": {
+    "bookByBookId": "Book",
+    "libraryByLibraryId": "Library",
+    "accountByAccountId": "Account",
+    "overdueFinesByCheckoutId": "OverdueFine"
+  },
+  "OverdueFine": {
+    "checkoutByCheckoutId": "Checkout"
+  }
 }

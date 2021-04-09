@@ -12,17 +12,17 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.18.1",
-    "graphql": "^14.4.2",
-    "graphql-anywhere": "^4.1.24",
-    "graphql-tag": "^2.10.0",
+    "graphql": "^14.6.0",
+    "graphql-anywhere": "^4.2.6",
+    "graphql-tag": "^2.10.3",
     "lodash": "^4.17.15"
   },
   "devDependencies": {
-    "@babel/cli": "^7.4.4",
-    "@babel/core": "^7.4.5",
-    "@babel/node": "^7.4.5",
-    "@babel/plugin-proposal-class-properties": "^7.4.4",
-    "@babel/preset-env": "^7.4.5",
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.6",
+    "@babel/node": "^7.8.4",
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/preset-env": "^7.8.6",
     "jest": "^24.9.0"
   }
 }

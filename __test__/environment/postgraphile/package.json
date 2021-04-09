@@ -9,6 +9,8 @@
   "author": "Nolan Aguirre",
   "license": "ISC",
   "dependencies": {
-    "postgraphile": "^4.5.5"
+    "express": "^4.17.1",
+    "postgraphile": "^4.5.5",
+    "postgraphile-plugin-connection-filter": "^1.1.3"
   }
 }

@@ -1,0 +1,25 @@
+{
+  "data": {
+    "__typename": "Query",
+    "allBooks": {
+      "__typename": "BooksConnection",
+      "nodes": [
+        {
+          "__typename": "Book",
+          "id": "9d0b8666-3693-4faa-87a3-3d1fefada4c9",
+          "name": "1984"
+        },
+        {
+          "__typename": "Book",
+          "id": "a540ed4c-f220-413d-b7d4-4fe1d4756976",
+          "name": "animal farm"
+        },
+        {
+          "__typename": "Book",
+          "id": "f7d0b063-e870-49fc-8f1c-79c4776e5af3",
+          "name": "the stranger"
+        }
+      ]
+    }
+  }
+}

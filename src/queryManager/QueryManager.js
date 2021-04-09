@@ -36,8 +36,14 @@ class QueryManager{
     _getById = (id) => {
         return this.queries[id]
     }
-
-
 }
+
+query:{
+    query,
+    variables.
+    eventEmitter
+}
+
+
 
 export default QueryManager

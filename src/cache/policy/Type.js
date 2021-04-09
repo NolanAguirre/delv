@@ -1,4 +1,4 @@
-const graphql = require('graphql-anywhere')
+const graphql = require('graphql-anywhere').default
 const gql = require('graphql-tag')
 
 const UID = 'id'

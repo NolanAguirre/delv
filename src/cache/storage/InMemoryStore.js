@@ -13,14 +13,15 @@ function StoreType() {
 
     const getValues = () => Object.values(store)
 
-    const toString = () => store
+    const getState = () => store
+
     return {
         get,
         set,
         remove,
         merge,
         getValues,
-        toString
+        getState
     }
 }
 
@@ -64,12 +65,12 @@ function InMemoryStore(){
         }
     }
 
-    const toString = () => {
+    const getState = () => {
         let printValue = {}
         for(let key of Object.keys(store)){
             const value = store[key]
             if(value){
-                printValue[key] = value.toString()
+                printValue[key] = value.getState()
             }
         }
         return printValue
@@ -84,7 +85,7 @@ function InMemoryStore(){
         setAbsolute,
         removeAbsolute,
         merge,
-        toString
+        getState
     }
 }
 

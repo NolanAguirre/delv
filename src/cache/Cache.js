@@ -1,15 +1,15 @@
 let UID = 'id'
 
 function Cache({storage, cacheProcesses, typeMap, emitter}) {
-    const process = Object.create(null)
+    let processes = Object.create(null)
 
-    cacheProcesses.forEach(process => {
-        const policy = new process({
+    cacheProcesses.forEach(cacheProcess => {
+        const policy = new cacheProcess({
             storage,
             typeMap,
             emitter
         })
-        process[policy.getName()] = policy
+        processes[policy.getName()] = policy
     })
 
     const read = ({cacheProcess, ...other}) => {
@@ -21,7 +21,7 @@ function Cache({storage, cacheProcesses, typeMap, emitter}) {
                 ...other
             })
         }else{
-            return process[cacheProcess].read(other)
+            return processes[cacheProcess].read(other)
         }
     }
 
@@ -34,23 +34,24 @@ function Cache({storage, cacheProcesses, typeMap, emitter}) {
                 ...other
             })
         }else{
-            process[cacheProcess].write(other)
+            processes[cacheProcess].write(other)
         }
     }
 
     const clear = storage.clear
 
-    const toString = () => {
-        let printValue = {
-            storage:storage.toString()
-        }
-        return printValue
-    }
+
+    const getState = () => ({
+        storage:storage.getState()
+    })
+
+    const toString = () => JSON.stringify(getState)
 
     return {
         read,
         write,
         clear,
+        getState,
         toString
     }
 }
