@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.18.1",
+    "axios": "^0.21.2",
     "graphql": "^14.4.2",
     "graphql-anywhere": "^4.1.24",
     "graphql-tag": "^2.10.0",
