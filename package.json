@@ -1,15 +1,58 @@
 {
-  "name": "gql-cache",
+  "name": "delv",
   "version": "0.9.0",
   "description": "A light weight caching library for graphql queries",
-  "main": "gql-cache.js",
-  "scripts": {
-    "build": "babel-node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "babel-node src/index.js"
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./react": "./src/react/delv-react.js"
   },
-  "author": "",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "docs/cache-design.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NolanAguirre/delv.git"
+  },
+  "keywords": [
+    "graphql",
+    "cache",
+    "postgraphile",
+    "react"
+  ],
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/__test__/environment/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/networkPolicy/Polling.js",
+      "!src/core/Mutation.js",
+      "!src/cache/policy/Query.js",
+      "!src/index.js"
+    ]
+  },
+  "author": "Nolan Aguirre",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NolanAguirre/delv/issues"
+  },
+  "homepage": "https://github.com/NolanAguirre/delv#readme",
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "axios": "^0.21.2",
     "graphql": "^14.4.2",
@@ -23,6 +66,9 @@
     "@babel/node": "^7.4.5",
     "@babel/plugin-proposal-class-properties": "^7.4.4",
     "@babel/preset-env": "^7.4.5",
-    "jest": "^24.9.0"
+    "@babel/preset-react": "^7.29.7",
+    "jest": "^24.9.0",
+    "react": "^17.0.2",
+    "react-test-renderer": "^17.0.2"
   }
 }

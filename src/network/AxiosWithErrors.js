@@ -1,4 +1,4 @@
-import axios from 'axios'
+const axios = require('axios')
 
 class AxiosWithErrors {
     constructor({url}) {
@@ -25,4 +25,4 @@ class AxiosWithErrors {
     }
 }
 
-export default AxiosWithErrors
+module.exports = AxiosWithErrors

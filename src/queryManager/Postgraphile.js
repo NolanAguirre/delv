@@ -1,4 +1,6 @@
 const graphql = require('graphql-anywhere')
+const gql = require('graphql-tag')
+const CONNECTION_WRAPPERS = ['nodes', 'edges', 'node']
 const BLACKLIST_FIELDS = [
     'node',
     'nodeId',
@@ -30,6 +32,7 @@ const BLACKLIST_TYPES = [
     'Datetime',
     'Interval',
     'BigFloat',
+    'BigInt',
     '__Type',
     'JSON'
 ]
@@ -72,18 +75,41 @@ function TypeMap({typeMap, api}) {
 
     const getTypes = (query) => {
         const types = []
-        const ast =  gql `${query}`
-        let type = ast.definitions[0].name && '__' + ast.definitions[0].name.value
-        if(type){
-            types.push(type)
-        }
-        const resolver = (fieldName, root, args, context, info) => {
-            if (!info.isLeaf && fieldName != 'nodes') {
-                types.push(TypeMap.guessChildType(TypeMap.get(fieldName)))
+        const push = (type) => {
+            if(type && !types.includes(type)){
+                types.push(type)
             }
-            return {}
         }
-        graphql(resolver, ast, null)
+        const ast = gql`${query}`
+        const operation = ast.definitions[0]
+        if(operation.name){
+            push('__' + operation.name.value)
+        }
+
+        const walk = (selectionSet, typeName) => {
+            if(!selectionSet){
+                return
+            }
+            const typeDefinition = (typeName && getTypeDefinition(typeName)) || {}
+            selectionSet.selections.forEach((selection) => {
+                if(selection.kind !== 'Field'){
+                    return
+                }
+                const fieldName = selection.name.value
+                if(fieldName === '__typename'){
+                    return
+                }
+                if(CONNECTION_WRAPPERS.includes(fieldName)){
+                    walk(selection.selectionSet, typeName)
+                    return
+                }
+                const childType = typeDefinition[fieldName]
+                push(childType)
+                walk(selection.selectionSet, childType)
+            })
+        }
+
+        walk(operation.selectionSet, 'Query')
         return types
     }
 
@@ -99,11 +125,9 @@ function TypeMap({typeMap, api}) {
         let exportData = _parseFields(data['__schema'].types)
         map = _arrayToObject(exportData)
         _findTypeConflicts(map)
-        console.log(JSON.stringify(map, null, 2))
+        return map
         // console.log('Delv is in development mode, include the typemap above as a config to delv to switch to production.')
     }
-
-
 
     const _parseFields = (types) => {
         return types.map(t => {
@@ -179,8 +203,7 @@ function TypeMap({typeMap, api}) {
             const axios = require('axios')
             axios.post(api, {query:INTROSPECTION_QUERY})
             .then((res) => {
-                _loadIntrospection(res.data.data)
-                resolve(this)
+                resolve(_loadIntrospection(res.data.data))
             }).catch((error) => {
                 reject(new Error('Introspection query incountered an error ' + error.message))
             })

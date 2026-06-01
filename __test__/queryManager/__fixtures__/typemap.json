@@ -1,0 +1,242 @@
+{
+    "Query": {
+      "allAccountMemberRoles": "AccountMemberRole",
+      "allAccountMembers": "AccountMember",
+      "allAccountTypes": "AccountType",
+      "allAccounts": "Account",
+      "allAssetBoardAssets": "AssetBoardAsset",
+      "allAssetBoards": "AssetBoard",
+      "allAssetStatuses": "AssetStatus",
+      "allAssetTypes": "AssetType",
+      "allAssets": "Asset",
+      "allEntities": "Entity",
+      "allEntityAssetBoards": "EntityAssetBoard",
+      "allEntityAssetLinks": "EntityAssetLink",
+      "allEntityNotes": "EntityNote",
+      "allEntityTerms": "EntityTerm",
+      "allEntityTypes": "EntityType",
+      "allEntityVariants": "EntityVariant",
+      "allExtensionAssetTypes": "ExtensionAssetType",
+      "allModelContentTypes": "ModelContentType",
+      "allModelModes": "ModelMode",
+      "allModelProviders": "ModelProvider",
+      "allModels": "Model",
+      "allPromptAssetLinks": "PromptAssetLink",
+      "allPrompts": "Prompt",
+      "allRawPrompts": "RawPrompt",
+      "allTermAssetLinks": "TermAssetLink",
+      "allTermEdges": "TermEdge",
+      "allTermLevels": "TermLevel",
+      "allTermNodeRelationships": "TermNodeRelationship",
+      "allTermNodes": "TermNode",
+      "allUserRoles": "UserRole",
+      "allUsers": "User",
+      "accountMemberRoleByRole": "AccountMemberRole",
+      "accountMemberById": "AccountMember",
+      "accountTypeByType": "AccountType",
+      "accountById": "Account",
+      "assetBoardAssetById": "AssetBoardAsset",
+      "assetBoardById": "AssetBoard",
+      "assetStatusByStatus": "AssetStatus",
+      "assetTypeByType": "AssetType",
+      "assetById": "Asset",
+      "entityById": "Entity",
+      "entityAssetBoardById": "EntityAssetBoard",
+      "entityAssetBoardByEntityIdAndAssetBoardId": "EntityAssetBoard",
+      "entityAssetLinkById": "EntityAssetLink",
+      "entityAssetLinkByEntityIdAndAssetIdAndEntityVariantId": "EntityAssetLink",
+      "entityNoteById": "EntityNote",
+      "entityTermById": "EntityTerm",
+      "entityTermByEntityIdAndTermNode": "EntityTerm",
+      "entityTypeByType": "EntityType",
+      "entityVariantById": "EntityVariant",
+      "extensionAssetTypeByExtension": "ExtensionAssetType",
+      "modelContentTypeByType": "ModelContentType",
+      "modelModeById": "ModelMode",
+      "modelProviderByProvider": "ModelProvider",
+      "modelById": "Model",
+      "modelByName": "Model",
+      "promptAssetLinkById": "PromptAssetLink",
+      "promptAssetLinkByPromptIdAndAssetId": "PromptAssetLink",
+      "promptById": "Prompt",
+      "rawPromptById": "RawPrompt",
+      "termAssetLinkById": "TermAssetLink",
+      "termAssetLinkByTermNodeAndAssetId": "TermAssetLink",
+      "termEdgeById": "TermEdge",
+      "termLevelByLevel": "TermLevel",
+      "termNodeRelationshipByRelationship": "TermNodeRelationship",
+      "termNodeById": "TermNode",
+      "userRoleByRole": "UserRole",
+      "userById": "User",
+      "userByEmail": "User",
+      "accountMemberRole": "AccountMemberRole",
+      "accountMember": "AccountMember",
+      "accountType": "AccountType",
+      "account": "Account",
+      "assetBoardAsset": "AssetBoardAsset",
+      "assetBoard": "AssetBoard",
+      "assetStatus": "AssetStatus",
+      "assetType": "AssetType",
+      "asset": "Asset",
+      "entity": "Entity",
+      "entityAssetBoard": "EntityAssetBoard",
+      "entityAssetLink": "EntityAssetLink",
+      "entityNote": "EntityNote",
+      "entityTerm": "EntityTerm",
+      "entityType": "EntityType",
+      "entityVariant": "EntityVariant",
+      "extensionAssetType": "ExtensionAssetType",
+      "modelContentType": "ModelContentType",
+      "modelMode": "ModelMode",
+      "modelProvider": "ModelProvider",
+      "model": "Model",
+      "promptAssetLink": "PromptAssetLink",
+      "prompt": "Prompt",
+      "rawPrompt": "RawPrompt",
+      "termAssetLink": "TermAssetLink",
+      "termEdge": "TermEdge",
+      "termLevel": "TermLevel",
+      "termNodeRelationship": "TermNodeRelationship",
+      "termNode": "TermNode",
+      "userRole": "UserRole",
+      "user": "User"
+    },
+    "AccountMemberRole": {
+      "accountMembersByRole": "AccountMember"
+    },
+    "AccountMember": {
+      "accountByAccountId": "Account",
+      "userByUserId": "User",
+      "accountMemberRoleByRole": "AccountMemberRole"
+    },
+    "Account": {
+      "accountTypeByType": "AccountType",
+      "accountMembersByAccountId": "AccountMember",
+      "assetsByAccountId": "Asset"
+    },
+    "AccountType": {
+      "accountsByType": "Account"
+    },
+    "Asset": {
+      "accountByAccountId": "Account",
+      "userByCreatedBy": "User",
+      "assetTypeByType": "AssetType",
+      "assetByCanonicalAssetId": "Asset",
+      "entitiesByThumbnailAssetId": "Entity",
+      "assetsByCanonicalAssetId": "Asset",
+      "termAssetLinksByAssetId": "TermAssetLink",
+      "promptAssetLinksByAssetId": "PromptAssetLink",
+      "assetBoardAssetsByAssetId": "AssetBoardAsset",
+      "entityAssetLinksByAssetId": "EntityAssetLink"
+    },
+    "User": {
+      "userRoleByRole": "UserRole",
+      "accountMembersByUserId": "AccountMember",
+      "assetsByCreatedBy": "Asset"
+    },
+    "UserRole": {
+      "usersByRole": "User"
+    },
+    "AssetType": {
+      "extensionAssetTypesByType": "ExtensionAssetType",
+      "assetsByType": "Asset"
+    },
+    "ExtensionAssetType": {
+      "assetTypeByType": "AssetType"
+    },
+    "Entity": {
+      "entityTypeByType": "EntityType",
+      "assetByThumbnailAssetId": "Asset",
+      "entityTermsByEntityId": "EntityTerm",
+      "entityNotesByEntityId": "EntityNote",
+      "entityVariantsByEntityId": "EntityVariant",
+      "entityAssetBoardsByEntityId": "EntityAssetBoard",
+      "entityAssetLinksByEntityId": "EntityAssetLink"
+    },
+    "EntityType": {
+      "entitiesByType": "Entity"
+    },
+    "EntityTerm": {
+      "entityByEntityId": "Entity",
+      "termNodeByTermNode": "TermNode"
+    },
+    "TermNode": {
+      "termLevelByLevel": "TermLevel",
+      "termEdgesByFromNode": "TermEdge",
+      "termEdgesByToNode": "TermEdge",
+      "promptsByTermNode": "Prompt",
+      "rawPromptsByTermNode": "RawPrompt",
+      "entityTermsByTermNode": "EntityTerm",
+      "termAssetLinksByTermNode": "TermAssetLink",
+      "lineage": "TermNode"
+    },
+    "TermLevel": {
+      "termNodesByLevel": "TermNode"
+    },
+    "TermNodeRelationship": {
+      "termEdgesByRelationship": "TermEdge"
+    },
+    "Prompt": {
+      "termNodeByTermNode": "TermNode",
+      "promptAssetLinksByPromptId": "PromptAssetLink"
+    },
+    "PromptAssetLink": {
+      "promptByPromptId": "Prompt",
+      "assetByAssetId": "Asset",
+      "assetStatusByStatus": "AssetStatus"
+    },
+    "AssetStatus": {
+      "termAssetLinksByStatus": "TermAssetLink",
+      "promptAssetLinksByStatus": "PromptAssetLink",
+      "entityAssetLinksByStatus": "EntityAssetLink"
+    },
+    "TermAssetLink": {
+      "termNodeByTermNode": "TermNode",
+      "assetByAssetId": "Asset",
+      "assetStatusByStatus": "AssetStatus"
+    },
+    "EntityAssetLink": {
+      "entityByEntityId": "Entity",
+      "assetByAssetId": "Asset",
+      "entityVariantByEntityVariantId": "EntityVariant",
+      "assetStatusByStatus": "AssetStatus"
+    },
+    "EntityVariant": {
+      "entityByEntityId": "Entity",
+      "entityAssetLinksByEntityVariantId": "EntityAssetLink"
+    },
+    "RawPrompt": {
+      "termNodeByTermNode": "TermNode",
+      "modelByModel": "Model"
+    },
+    "Model": {
+      "modelProviderByProvider": "ModelProvider",
+      "modelContentTypeByInputType": "ModelContentType",
+      "modelContentTypeByOutputType": "ModelContentType",
+      "rawPromptsByModel": "RawPrompt"
+    },
+    "ModelProvider": {
+      "modelsByProvider": "Model"
+    },
+    "ModelContentType": {
+      "modelsByInputType": "Model",
+      "modelsByOutputType": "Model"
+    },
+    "EntityNote": {
+      "entityByEntityId": "Entity"
+    },
+    "EntityAssetBoard": {
+      "entityByEntityId": "Entity",
+      "assetBoardByAssetBoardId": "AssetBoard"
+    },
+    "AssetBoard": {
+      "assetBoardAssetsByAssetBoardId": "AssetBoardAsset",
+      "entityAssetBoardsByAssetBoardId": "EntityAssetBoard"
+    },
+    "AssetBoardAsset": {
+      "assetBoardByAssetBoardId": "AssetBoard",
+      "assetByAssetId": "Asset"
+    },
+    "ModelMode": {}
+  }
+  

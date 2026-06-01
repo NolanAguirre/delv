@@ -6,25 +6,28 @@ class CacheFirst {
     }
     getName = () => 'cache-first'
 
-    process = async ({query, variables, queryId, cacheProcess}) => {
+    process = ({query, variables, queryId, cacheProcess, ...other}) => {
         const queryObj = this.queryManager.get({query, variables})
         if(queryObj.isPending){
             return queryObj.promise
         }
         try{
-            return this.cache.read({cacheProcess, query, variables})
+            return Promise.resolve(this.cache.read({cacheProcess, query, variables}))
         } catch {
             queryObj.isPending = true
-            this.network.post({query, variables})
+            queryObj.promise = this.network.post({query, variables})
             .then((res)=>{
                 this.cache.write({cacheProcess, data:res.data, ...other})
                 queryObj.isPending = false
                 queryObj.success = true
+                queryObj.fail = false
+                queryObj.promise = null
                 return res.data.data
             }).catch((error)=>{
                 queryObj.isPending = false
                 queryObj.fail = true
-                return error
+                queryObj.promise = null
+                throw error
             })
             return queryObj.promise
         }
@@ -33,4 +36,4 @@ class CacheFirst {
 
 
 
-export default CacheFirst
+module.exports = CacheFirst

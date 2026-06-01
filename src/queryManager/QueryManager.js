@@ -1,4 +1,4 @@
-import gql from 'graphql-tag'
+const gql = require('graphql-tag')
 
 class QueryManager{
     constructor(){
@@ -15,14 +15,23 @@ class QueryManager{
         const normalized = this.normalize(query, variables)
         if(!this.includes(null, null, normalized)){
             const id = normalized.substring(0,2) === '__'?normalized:Math.random().toString(36).substr(2, 9)
-            this.queries[normalized] = {}
+            const queryObj = {
+                id,
+                normalized,
+                isPending: false,
+                promise: null,
+                success: false,
+                fail: false
+            }
+            this.queries[normalized] = queryObj
+            this.queries[id] = queryObj
             return this.queries[normalized]
         }
         return this.queries[normalized]
     }
 
     includes = (query, variables, normalized) => {
-         return this.queries[normalized || this.normalizeQuery(query, variables)]
+         return this.queries[normalized || this.normalize(query, variables)]
     }
 
 
@@ -37,7 +46,19 @@ class QueryManager{
         return this.queries[id]
     }
 
+    remove = (query, variables) => {
+        const normalized = this.normalize(query, variables)
+        const queryObj = this.queries[normalized]
+        if(queryObj){
+            delete this.queries[queryObj.id]
+            delete this.queries[normalized]
+        }
+    }
+
+    clear = () => {
+        this.queries = Object.create(null)
+    }
 
 }
 
-export default QueryManager
+module.exports = QueryManager

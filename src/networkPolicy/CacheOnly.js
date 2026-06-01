@@ -7,10 +7,10 @@ class CacheOnly {
     getName = () => 'cache-only'
 
     process = ({query, variables, cacheProcess}) => {
-        return this.cache.read({cacheProcess, query, variables})
+        return Promise.resolve().then(() => this.cache.read({cacheProcess, query, variables}))
     }
 }
 
 
 
-export default CacheOnly
+module.exports = CacheOnly

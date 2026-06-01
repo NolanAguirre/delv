@@ -1,132 +1,133 @@
-import React, {Component} from 'react'
-import graphql from 'graphql-anywhere'
-import Delv from './delv'
-import Query from './Query'
+import React, {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react'
 
-class Query extends Component {
-    constructor(props) {
-        super(props)
-        this.state = {
-            loading:true
-        }
+const DelvContext = createContext(null)
+
+const DelvProvider = ({client, children}) => (
+    <DelvContext.Provider value={client}>{children}</DelvContext.Provider>
+)
+
+const useDelv = () => useContext(DelvContext)
+
+const sameData = (a, b) => {
+    try{
+        return JSON.stringify(a) === JSON.stringify(b)
+    }catch(e){
+        return false
+    }
+}
+
+const useQuery = ({query, variables, networkPolicy, cacheProcess, skip} = {}, clientOverride) => {
+    const contextClient = useDelv()
+    const client = clientOverride || contextClient
+    if(!client){
+        throw new Error('delv-react: no Delv client found. Wrap the tree in <DelvProvider client={delv}> or pass a client to useQuery.')
     }
 
-    componentDidMount = () => {
-        this.resetProps()
-    }
+    const variablesKey = variables ? JSON.stringify(variables) : ''
+    const [state, setState] = useState(() => ({
+        loading: !skip,
+        data: undefined,
+        error: undefined
+    }))
 
-    resetProps = () => {
-        if(this.query){
-            this.query.removeCacheListener();
-            this.query.removeListeners();
+    const mountedRef = useRef(true)
+    const requestRef = useRef(0)
+
+    useEffect(() => {
+        mountedRef.current = true
+        return () => {
+            mountedRef.current = false
         }
-        this.query = new Query({
-            query: this.props.query,
-            variables: this.props.variables,
-            networkPolicy:this.props.networkPolicy,
-            cachePolicy:this.props.cachePolicy
+    }, [])
+
+    const run = useCallback(() => {
+        const requestId = requestRef.current + 1
+        requestRef.current = requestId
+        setState((prev) => ({...prev, loading: true, error: undefined}))
+        return client.query({query, variables, networkPolicy, cacheProcess})
+            .then((data) => {
+                if(mountedRef.current && requestRef.current === requestId){
+                    setState({loading: false, data, error: undefined})
+                }
+                return data
+            })
+            .catch((error) => {
+                if(mountedRef.current && requestRef.current === requestId){
+                    setState({loading: false, data: undefined, error})
+                }
+                throw error
+            })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [client, query, variablesKey, networkPolicy, cacheProcess])
+
+    useEffect(() => {
+        if(skip){
+            setState({loading: false, data: undefined, error: undefined})
+            return undefined
+        }
+        run().catch(() => {})
+        return undefined
+    }, [run, skip])
+
+    useEffect(() => {
+        if(skip){
+            return undefined
+        }
+        const queryTypes = client.getQueryTypes ? client.getQueryTypes(query) : []
+        const unsubscribe = client.subscribe((changedTypes) => {
+            const types = changedTypes || []
+            const relevant = !queryTypes.length || types.some((type) => queryTypes.includes(type))
+            if(!relevant){
+                return
+            }
+            let next
+            try{
+                next = client.readCache({query, variables, cacheProcess})
+            }catch(e){
+                return
+            }
+            if(!mountedRef.current){
+                return
+            }
+            setState((prev) => {
+                if(!prev.loading && !prev.error && sameData(prev.data, next)){
+                    return prev
+                }
+                return {loading: false, data: next, error: undefined}
+            })
         })
-        if (this.query.networkPolicy !== 'network-only') {
-            this.query.addCacheListener();
-        }
-        this.query.query();
-    }
+        return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [client, query, variablesKey, cacheProcess, skip])
 
-    componentWillUnmount = () => {
-        this.query.removeCacheListener();
-        this.query.removeListeners();
+    return {
+        loading: state.loading,
+        data: state.data,
+        error: state.error,
+        refetch: run
     }
+}
 
-    componentDidUpdate = (prevProps, prevState, snapshot) => {
-        if (prevProps.query != this.props.query) {
-            this.resetProps()
-        }
+const DelvQuery = ({children, client, ...queryProps}) => {
+    const result = useQuery(queryProps, client)
+    if(typeof children === 'function'){
+        return children(result)
     }
+    return children || null
+}
 
-    shouldComponentUpdate = (nextProps, nextState) => {
-        // if(this.state === nextState && nextProps.query === this.props.query){
-        //     return false
-        // }
-        if(this.state.queryResult === '' && nextState.queryResult === '' && nextProps.loading == this.props.loading){
-            return false
-        }
-        return true
-    }
-
-    onResolve = (data) => {
-        this.setState({queryResult: data, loading:false})
-        if(this.props.onResolve){
-            this.props.onResolve(data)
-        }
-    }
-
-    onError = (error) => {
-        if(this.props.onError){
-            this.props.onError(error)
-        }else{
-            this.setState({error:error.error, loading:false})
-        }
-    }
-
-    render = () => {
-        const {
-            query,
-            variables,
-            networkPolicy,
-            onFetch,
-            onResolve,
-            onError,
-            formatResult,
-            cacheProcess,
-            children,
-            loading,
-            ...otherProps
-        } = this.props
-        if (this.state.loading && !this.props.skipLoading) {
-            if (this.props.loading) {
-                return this.props.loading
-            }
-            return <div>loading</div>
-        }
-        if(this.state.error){ //TODO make this better too
-            return React.cloneElement(this.props.children, {
-                ...this.state.error, ...otherProps
-            })
-        }else{
-            return React.cloneElement(this.props.children, {
-                ...this.state.queryResult, ...otherProps
-            })
-        }
-    }
+const withQuery = (config = {}) => (WrappedComponent) => (props) => {
+    const resolved = typeof config === 'function' ? config(props) : config
+    const {client, ...queryProps} = resolved
+    const result = useQuery(queryProps, client)
+    return <WrappedComponent {...props} {...result} />
 }
 
 export {
-    ReactQuery
-}
-
-
-function ReactQueryHOC(WrappedComponent, config){
-    return (props) => {
-        if(config.queryFunction){
-            let args = config.queryArgs
-            if(args instanceof Function){
-                args = config.queryArgs(props)
-            }else{
-                args = props[args]
-            }
-            config.query = config.queryFunction(args)
-        }
-        const {
-            queryFunction,
-            queryArgs,
-            ...newProps
-        } = config
-        return <ReactQuery {...newProps}>
-            <WrappedComponent {...props} />
-        </ReactQuery>
-    }
-}
-
-export {
-    ReactQueryHOC
+    DelvContext,
+    DelvProvider,
+    useDelv,
+    useQuery,
+    DelvQuery,
+    withQuery
 }

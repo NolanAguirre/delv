@@ -12,9 +12,7 @@ class NetworkOnce {
             return queryObj.promise
         }else if(queryObj.success){
             if(!queryObj.promise){
-                queryObj.promise = new Promise((resolve, reject) => {
-                    resolve(this.cache.read({cacheProcess, query, variables}))
-                })
+                queryObj.promise = Promise.resolve().then(() => this.cache.read({cacheProcess, query, variables}))
             }
             return queryObj.promise
 
@@ -25,6 +23,7 @@ class NetworkOnce {
             this.cache.write({cacheProcess, data:res.data, ...other})
             queryObj.isPending = false
             queryObj.success = true
+            queryObj.fail = false
             queryObj.promise = null
             return res.data.data
         }).catch((error)=>{
@@ -39,4 +38,4 @@ class NetworkOnce {
 
 
 
-export default NetworkOnce
+module.exports = NetworkOnce

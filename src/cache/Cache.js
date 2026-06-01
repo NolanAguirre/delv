@@ -3,8 +3,8 @@ let UID = 'id'
 function Cache({storage, cacheProcesses, typeMap, emitter}) {
     const process = Object.create(null)
 
-    cacheProcesses.forEach(process => {
-        const policy = new process({
+    cacheProcesses.forEach((ProcessClass) => {
+        const policy = new ProcessClass({
             storage,
             typeMap,
             emitter
@@ -40,6 +40,19 @@ function Cache({storage, cacheProcesses, typeMap, emitter}) {
 
     const clear = storage.clear
 
+    const subscribe = (callback) => {
+        const id = '_' + Math.random().toString(36).substr(2, 9)
+        emitter.on(id, callback)
+        return () => emitter.off(id)
+    }
+
+    const getQueryTypes = (query) => {
+        if(typeMap && typeMap.getTypes){
+            return typeMap.getTypes(query)
+        }
+        return []
+    }
+
     const toString = () => {
         let printValue = {
             storage:storage.toString()
@@ -51,6 +64,8 @@ function Cache({storage, cacheProcesses, typeMap, emitter}) {
         read,
         write,
         clear,
+        subscribe,
+        getQueryTypes,
         toString
     }
 }

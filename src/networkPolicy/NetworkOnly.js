@@ -1,4 +1,4 @@
-class NetworkOnce {
+class NetworkOnly {
     constructor({cache, network, queryManager}){
         this.cache = cache
         this.network = network
@@ -12,19 +12,22 @@ class NetworkOnce {
             return queryObj.promise
         }
         queryObj.isPending = true
-        this.network.post({query, variables})
+        queryObj.promise = this.network.post({query, variables})
         .then((res)=>{
             this.cache.write({cacheProcess, data:res.data, ...other})
             queryObj.isPending = false
             queryObj.success = true
+            queryObj.fail = false
+            queryObj.promise = null
             return res.data.data
         }).catch((error)=>{
             queryObj.isPending = false
             queryObj.fail = true
-            return error
+            queryObj.promise = null
+            throw error
         })
         return queryObj.promise
     }
 }
 
-export default NetworkOnce
+module.exports = NetworkOnly
