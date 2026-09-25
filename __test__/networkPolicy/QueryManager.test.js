@@ -14,8 +14,8 @@ describe('QueryManager', () => {
         const queryObj = queryManager.get({query})
 
         expect(queryObj).toMatchObject({
-            id: '__GetUser',
-            normalized: '__GetUser',
+            id: expect.any(String),
+            normalized: queryManager.normalize(query),
             isPending: false,
             promise: null,
             success: false,
@@ -43,7 +43,33 @@ describe('QueryManager', () => {
         const variables = {id: '1'}
         const normalized = queryManager.normalize('{ user { id } }', variables)
 
-        expect(normalized).toBe('{user{id}}{"id":"1"}')
+        expect(normalized).toBe('{\n  user {\n    id\n  }\n}\n{"id":"1"}')
+    })
+
+    it('shares identity across query formatting changes', () => {
+        const manager = new QueryManager()
+        expect(manager.get({query: '{user{id}}'})).toBe(
+            manager.get({query: '{\n  user { id }\n}'}))
+    })
+
+    it('preserves whitespace inside variables', () => {
+        const manager = new QueryManager()
+        const query = '{ user { id } }'
+        expect(manager.get({query, variables: {name: 'A B'}})).not.toBe(
+            manager.get({query, variables: {name: 'AB'}}))
+    })
+
+    it.each(['AB', 'A  B'])('preserves inline string differences from A B: %s', (name) => {
+        const manager = new QueryManager()
+        expect(manager.get({query: '{ user(name: "A B") { id } }'})).not.toBe(
+            manager.get({query: `{ user(name: "${name}") { id } }`}))
+    })
+
+    it('distinguishes same-name queries with different selection fields', () => {
+        const manager = new QueryManager()
+        const variables = {name: 'A B'}
+        expect(manager.get({query: 'query User { user { id } }', variables})).not.toBe(
+            manager.get({query: 'query User { user { id name } }', variables}))
     })
 
     it('removes and clears query objects', () => {

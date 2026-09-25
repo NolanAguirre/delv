@@ -32,7 +32,7 @@ describe('NetworkOnce', () => {
         return expect(policy.process({query, variables, cacheProcess: 'type'})).resolves.toEqual(response.data.data)
             .then(() => {
                 expect(network.post).toHaveBeenCalledWith({query, variables})
-                expect(cache.write).toHaveBeenCalledWith({cacheProcess: 'type', data: response.data})
+                expect(cache.write).toHaveBeenCalledWith({cacheProcess: 'type', data: response.data, query, variables})
             })
     })
 

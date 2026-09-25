@@ -37,7 +37,13 @@ describe('Postgraphile TypeMap', () => {
     it('derives the committed typemap from the introspection fixture', () => {
         mockIntrospection(introspection)
 
-        return expect(TypeMap({api: 'http://fixture/graphql'})).resolves.toEqual(typemap)
+        return TypeMap({api: 'http://fixture/graphql'}).then(({__fields, ...relationships}) => {
+            expect(relationships).toEqual({...typemap, TermEdge: {
+                termNodeByFromNode: 'TermNode', termNodeByToNode: 'TermNode',
+                termNodeRelationshipByRelationship: 'TermNodeRelationship'
+            }})
+            expect(__fields.Query).toBeDefined()
+        })
     })
 
     it('resolves *Connection field types from the description backtick', () => {
@@ -103,7 +109,7 @@ describe('Postgraphile TypeMap', () => {
         ])
 
         return TypeMap({api: 'http://fixture/graphql'}).then((map) => {
-            expect(Object.keys(map)).toEqual(['Account'])
+            expect(Object.keys(map).filter((key) => key !== '__fields')).toEqual(['Account'])
             expect(map.AccountsEdge).toBeUndefined()
             expect(map.CreateAccountPayload).toBeUndefined()
             expect(map.AccountsConnection).toBeUndefined()
@@ -131,7 +137,7 @@ describe('Postgraphile TypeMap', () => {
         })
     })
 
-    it('warns on repeated relationship types but keeps both fields', () => {
+    it('retains repeated relationship fields for configuration without logging warnings', () => {
         mockTypes([
             {
                 name: 'Account',
@@ -148,9 +154,8 @@ describe('Postgraphile TypeMap', () => {
                 ownerByOwnerId: 'User',
                 creatorByCreatedBy: 'User'
             })
-            expect(logSpy).toHaveBeenCalled()
-            const conflict = logSpy.mock.calls.some((call) => /conflict detected/.test(call[0]))
-            expect(conflict).toBe(true)
+            expect(logSpy).not.toHaveBeenCalled()
+            expect(TypeMap({typeMap: map}).isNetworkGenerated).toBe(true)
         })
     })
 
@@ -207,4 +212,116 @@ describe('Postgraphile TypeMap', () => {
             expect(result.getTypes(query)).toEqual(['__Books', 'Book'])
         })
     })
+})
+
+it('retains scalar/wrapped field metadata and mutation payloads when introspecting', async () => {
+    mockTypes([
+        {name: 'Query', fields: [{name: 'allBooks', type: {name: 'BooksConnection'}}]},
+        {name: 'Book', fields: [{name: 'position', type: {name: null, ofType: {name: 'BigFloat'}}}]},
+        {name: 'BooksConnection', fields: [{name: 'nodes', type: {name: null, ofType: {name: null, ofType: {name: null, ofType: {name: 'Book'}}}}}]},
+        {name: 'Mutation', fields: [{name: 'moveBook', type: {name: 'MoveBookPayload'}}]},
+        {name: 'MoveBookPayload', fields: [{name: 'book', type: {name: 'Book'}}]}
+    ])
+    const map = await TypeMap({api: '/graphql'})
+    const hydrated = TypeMap({typeMap: JSON.parse(JSON.stringify(map))})
+    expect(hydrated.getFields('Book').position).toBe('BigFloat')
+    expect(hydrated.getFields('BooksConnection').nodes).toBe('Book')
+    expect(hydrated.getFields('Mutation').moveBook).toBe('MoveBookPayload')
+    expect(hydrated.getFields('MoveBookPayload').book).toBe('Book')
+})
+
+it('serializes manually supplied output fields with a prebuilt map', () => {
+    const original = TypeMap({typeMap: {Book: {}}, fields: {Book: {position: 'BigFloat'}}})
+    const restored = TypeMap({typeMap: JSON.parse(JSON.stringify(original.toString()))})
+    expect(restored.getFields('Book').position).toBe('BigFloat')
+})
+
+describe('cache keys', () => {
+    const scalar = (name) => ({kind: 'SCALAR', name, ofType: null})
+    const object = (name) => ({kind: 'OBJECT', name, ofType: null})
+    const nonNull = (type) => ({kind: 'NON_NULL', name: null, ofType: type})
+    const field = (name, type, args = []) => ({name, type, args})
+    const arg = (name, type) => ({name, defaultValue: null, type})
+    const lookup = (name, type, ...args) => field(name, object(type), args.map(([argName, argType]) => arg(argName, nonNull(scalar(argType)))))
+    const types = (extraQuery = [], extraTypes = []) => [
+        {name: 'Query', fields: [
+            field('allEntityTypes', {kind: 'OBJECT', name: 'EntityTypesConnection', description: 'A connection to a list of `EntityType` values.', ofType: null}),
+            lookup('entityTypeByType', 'EntityType', ['type', 'String']),
+            lookup('entityType', 'EntityType', ['nodeId', 'ID']),
+            lookup('accountById', 'Account', ['id', 'Int']),
+            ...extraQuery
+        ]},
+        {name: 'EntityTypesConnection', fields: [field('nodes', {kind: 'LIST', name: null, ofType: object('EntityType')})]},
+        {name: 'EntityType', fields: [field('nodeId', nonNull(scalar('ID'))), field('type', nonNull(scalar('String'))), field('description', scalar('String'))]},
+        {name: 'Account', fields: [field('nodeId', nonNull(scalar('ID'))), field('id', nonNull(scalar('Int'))), field('name', scalar('String'))]},
+        ...extraTypes
+    ]
+    const pair = {name: 'Pair', fields: [field('left', nonNull(scalar('Int'))), field('right', nonNull(scalar('Int')))]}
+    const composite = lookup('pairByLeftAndRight', 'Pair', ['left', 'Int'], ['right', 'Int'])
+
+    it('detects a single-column lookup as the key and leaves id types alone', async () => {
+        mockTypes(types())
+        const map = await TypeMap({api: '/graphql'})
+        expect(map.__keys).toEqual({EntityType: 'type'})
+        expect(logSpy).not.toHaveBeenCalled()
+        const hydrated = TypeMap({typeMap: JSON.parse(JSON.stringify(map))})
+        expect(hydrated.getKey('EntityType')).toBe('type')
+        expect(hydrated.getKey('Account')).toBe('id')
+    })
+
+    it('logs and sets no key when a type has more than one single-column lookup', async () => {
+        mockTypes(types([lookup('fooByA', 'Foo', ['a', 'String']), lookup('fooByB', 'Foo', ['b', 'String'])],
+            [{name: 'Foo', fields: [field('a', nonNull(scalar('String'))), field('b', nonNull(scalar('String')))]}]))
+        const map = await TypeMap({api: '/graphql'})
+        expect(map.__keys).toEqual({EntityType: 'type'})
+        expect(logSpy).toHaveBeenCalledWith('delv: Foo has multiple single-column lookups (fooByA, fooByB); it will not be cached. Set keys.Foo in TypeMap config.')
+    })
+
+    it('logs and sets no key for a composite lookup', async () => {
+        mockTypes(types([composite], [pair]))
+        const map = await TypeMap({api: '/graphql'})
+        expect(map.__keys).toEqual({EntityType: 'type'})
+        expect(logSpy).toHaveBeenCalledWith('delv: Pair has no id and no single-column lookup; it will not be cached. Set keys.Pair in TypeMap config.')
+    })
+
+    it('skips the log for types configured with keys during introspection', async () => {
+        mockTypes(types([composite], [pair]))
+        await TypeMap({api: '/graphql', keys: {Pair: 'left'}})
+        expect(logSpy).not.toHaveBeenCalled()
+    })
+
+    it('lets configured keys override detection and serializes them', async () => {
+        mockTypes(types([composite], [pair]))
+        const map = await TypeMap({api: '/graphql'})
+        const configured = TypeMap({typeMap: map, keys: {EntityType: 'description', Pair: 'left'}})
+        expect(configured.getKey('EntityType')).toBe('description')
+        expect(configured.getKey('Pair')).toBe('left')
+        expect(configured.toString().__keys).toEqual({EntityType: 'description', Pair: 'left'})
+        const restored = TypeMap({typeMap: JSON.parse(JSON.stringify(configured.toString()))})
+        expect(restored.getKey('Pair')).toBe('left')
+    })
+
+    it('logs a configured key that is not a field of its type', async () => {
+        mockTypes(types())
+        const map = await TypeMap({api: '/graphql'})
+        TypeMap({typeMap: map, keys: {EntityType: 'missing'}})
+        expect(logSpy).toHaveBeenCalledWith("delv: keys.EntityType = 'missing' is not a field of EntityType")
+    })
+
+    it('defaults to id for handwritten maps', () => {
+        expect(TypeMap({typeMap: {Book: {}}}).getKey('Book')).toBe('id')
+    })
+})
+
+it('retains nested list and non-null wrappers and enum values from introspection', async () => {
+    mockTypes([
+        {name: 'Query', fields: [{name: 'scores', type: {kind: 'NON_NULL', ofType: {kind: 'LIST', ofType: {kind: 'NON_NULL', ofType: {kind: 'SCALAR', name: 'Float'}}}}}]},
+        {name: 'Status', enumValues: [{name: 'ACTIVE'}]}
+    ])
+    const map = TypeMap({typeMap: await TypeMap({api: 'http://fixture/graphql'})})
+    expect(map.getFieldType('Query', 'scores')).toBe('[Float!]!')
+    expect(map.getFields('Query').scores).toBe('Float')
+    expect(map.getEnumValues('Status')).toEqual(['ACTIVE'])
+    const {parse} = require('graphql')
+    expect(() => parse(axios.post.mock.calls[0][1].query)).not.toThrow()
 })

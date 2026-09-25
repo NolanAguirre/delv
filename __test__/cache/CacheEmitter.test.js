@@ -26,4 +26,31 @@ describe('Cache Emitter unit test', () => {
         emitter.emitCacheUpdate()
     })
 
+    it('batches nested updates into one emit when the outermost batch exits', () => {
+        const batching = new CacheEmitter()
+        const emits = []
+        batching.on('listener', (types) => emits.push(types))
+
+        const result = batching.batch(() => {
+            batching.updateType('Book')
+            batching.emitCacheUpdate()
+            batching.batch(() => {
+                batching.updateType('Author')
+                batching.emitCacheUpdate()
+            })
+            expect(emits).toEqual([])
+            return 'done'
+        })
+
+        expect(result).toBe('done')
+        expect(emits).toEqual([['Book', 'Author']])
+        expect(() => batching.batch(() => {
+            batching.updateType('User')
+            throw new Error('boom')
+        })).toThrow('boom')
+        expect(emits).toEqual([['Book', 'Author'], ['User']])
+        batching.batch(() => {})
+        expect(emits).toHaveLength(2)
+    })
+
 })

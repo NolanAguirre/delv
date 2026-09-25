@@ -1,0 +1,70 @@
+---
+description: SQL schema and migration conventions
+globs: **/*.sql
+alwaysApply: false
+---
+
+# Database schema conventions
+
+## Primary keys
+
+Every table has an `id` uuid primary key defaulting to `gen_random_uuid()`.
+
+```sql
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+```
+
+## Fully qualified names
+
+Always schema-qualify tables, references, and indexes. Never rely on
+`search_path` in migrations.
+
+```sql
+-- ✅ GOOD
+CREATE TABLE lbry.city (...);
+CREATE INDEX city_state_id_idx ON lbry.city (state_id);
+
+-- ❌ BAD
+CREATE TABLE city (...);
+```
+
+## Text columns use citext
+
+Enable the extension once, then use `citext` (case-insensitive) instead of
+`text` for all text columns.
+
+```sql
+CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA lbry;
+name lbry.citext NOT NULL,
+```
+
+## Foreign keys
+
+- Reference the fully qualified target table.
+- Do NOT use `ON DELETE CASCADE` / `ON DELETE SET NULL`; leave the default
+  `NO ACTION` so deletes are explicit.
+- Create an index on every FK column (Postgres does not add one automatically).
+
+```sql
+-- ✅ GOOD
+state_id uuid NOT NULL REFERENCES lbry.state (id),
+...
+CREATE INDEX city_state_id_idx ON lbry.city (state_id);
+
+-- ❌ BAD
+state_id uuid NOT NULL REFERENCES lbry.state (id) ON DELETE CASCADE,
+```
+
+## Timestamps
+
+Every table has `created_at` and `updated_at`.
+
+```sql
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+```
+
+## Constraints
+
+- Natural keys (codes, emails, isbns, barcodes) get a `UNIQUE` constraint.
+- Join tables carry a composite `UNIQUE (a_id, b_id)` plus an index per FK.

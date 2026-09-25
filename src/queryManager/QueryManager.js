@@ -1,27 +1,33 @@
-const gql = require('graphql-tag')
+const { gql } = require('graphql-tag')
+const queryKey = require('./QueryKey')
 
 class QueryManager{
     constructor(){
         this.queries = Object.create(null)
     }
 
-    normalize = (query, variables)  => {
-        const ast = gql`${query}`
-        const normalized = ast.definitions[0].name && '__' + ast.definitions[0].name.value
-        return normalized || `${query}${JSON.stringify(variables)}`.replace(/\s+/g, '')
-    }
+    normalize = queryKey
 
     _add = (query, variables) => {
         const normalized = this.normalize(query, variables)
-        if(!this.includes(null, null, normalized)){
+        const isMutation = gql`${query}`.definitions.some((definition) => (
+            definition.kind === 'OperationDefinition' && definition.operation === 'mutation'
+        ))
+        if(isMutation || !this.includes(null, null, normalized)){
             const id = normalized.substring(0,2) === '__'?normalized:Math.random().toString(36).substr(2, 9)
             const queryObj = {
                 id,
                 normalized,
+                isMutation,
                 isPending: false,
                 promise: null,
                 success: false,
                 fail: false
+            }
+            // Each mutation invocation is a separate action. Give policies
+            // private request state so they cannot reuse another invocation.
+            if(isMutation){
+                return queryObj
             }
             this.queries[normalized] = queryObj
             this.queries[id] = queryObj

@@ -1,5 +1,7 @@
 function CacheEmitter() {
     let changedTypes = []
+    let depth = 0
+    let requested = false
     const events = Object.create(null)
 
     const on = (eventName, callback) => {
@@ -26,10 +28,29 @@ function CacheEmitter() {
     }
 
     const emitCacheUpdate = () => {
-        for(let event of Object.values(events)){
-            event(changedTypes)
+        if(depth > 0){
+            requested = true
+            return
         }
+        const types = changedTypes
         changedTypes = []
+        for(let event of Object.values(events)){
+            event(types)
+        }
+    }
+
+    // Subscribers see one final state for everything written inside fn.
+    const batch = (fn) => {
+        depth++
+        try{
+            return fn()
+        }finally{
+            depth--
+            if(depth === 0 && (requested || changedTypes.length)){
+                requested = false
+                emitCacheUpdate()
+            }
+        }
     }
 
     return {
@@ -38,6 +59,7 @@ function CacheEmitter() {
         off,
         updateType,
         emitCacheUpdate,
+        batch
     }
 }
 

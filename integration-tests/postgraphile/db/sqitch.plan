@@ -1,0 +1,5 @@
+%syntax-version=1.0.0
+%project=lbry
+
+v1.000.0 2026-07-01T00:00:00Z Nolan Aguirre <nolan@example.com> # Initial lbry schema and all tables
+v1.001.0 [v1.000.0] 2026-07-01T00:00:00Z Nolan Aguirre <nolan@example.com> # Split checkout into active + checkout_history with return_checkout function

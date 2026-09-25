@@ -1,0 +1,43 @@
+---
+description: Preferred way to run delv queries and mutations in React
+globs: **/*.js,**/*.jsx,**/*.tsx
+alwaysApply: false
+---
+
+# delv React usage
+
+Wrap the app once in `DelvProvider` so the client is available via context.
+
+## Queries: prefer the `DelvQuery` wrapper component
+
+Use the `DelvQuery` render-prop component as the default way to run queries. It
+keeps data fetching declarative and colocated with the markup that renders it.
+
+```jsx
+// ✅ PREFERRED
+<DelvQuery query={GET_USERS} variables={{id}}>
+    {({loading, data, error}) => {
+        if(loading) return <Spinner />
+        if(error) return <Error error={error} />
+        return <UserList users={data.users} />
+    }}
+</DelvQuery>
+```
+
+Use the `useQuery` hook or `withQuery` HOC only when the wrapper component does
+not fit (e.g. you need the query result outside of the render tree, or to
+compose several hooks together).
+
+```jsx
+// Acceptable fallback
+const {loading, data, error} = useQuery({query: GET_USERS, variables: {id}})
+```
+
+## Mutations: use the `useMutation` hook
+
+There is no wrapper component for mutations, so use the hook. It returns a
+`[mutate, {loading, data, error}]` tuple.
+
+```jsx
+const [createUser, {loading}] = useMutation({mutation: CREATE_USER})
+```

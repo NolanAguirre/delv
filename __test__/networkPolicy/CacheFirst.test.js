@@ -25,29 +25,46 @@ const createPolicy = () => {
 }
 
 describe('CacheFirst', () => {
-    it('returns cache data on hit', () => {
+    it('fetches on the first request even when the cache has data', () => {
         const {cache, network, policy} = createPolicy()
-        const data = {user: {id: '1'}}
-        cache.read.mockReturnValue(data)
-        const promise = policy.process({query, variables, cacheProcess: 'type'})
-
-        expect(network.post).not.toHaveBeenCalled()
-        return expect(promise).resolves.toBe(data)
-    })
-
-    it('fetches and writes to cache on miss', () => {
-        const {cache, network, policy} = createPolicy()
-        const error = new Error('cache miss')
-        cache.read.mockImplementation(() => {
-            throw error
-        })
+        cache.read.mockReturnValue({user: {id: 'stale'}})
         network.post.mockResolvedValue(response)
 
         return expect(policy.process({query, variables, cacheProcess: 'type'})).resolves.toEqual(response.data.data)
             .then(() => {
                 expect(network.post).toHaveBeenCalledWith({query, variables})
-                expect(cache.write).toHaveBeenCalledWith({cacheProcess: 'type', data: response.data})
+                expect(cache.write).toHaveBeenCalledWith({cacheProcess: 'type', data: response.data, query, variables,
+                    connectionSource: {data: response.data.data, selectionQuery: query}})
             })
+    })
+
+    it('serves the cache on subsequent requests after a successful fetch', () => {
+        const {cache, network, policy} = createPolicy()
+        const cached = {user: {id: '1'}}
+        network.post.mockResolvedValue(response)
+        cache.read.mockReturnValue(cached)
+
+        return policy.process({query, variables, cacheProcess: 'type'}).then(() => {
+            expect(network.post).toHaveBeenCalledTimes(1)
+            const second = policy.process({query, variables, cacheProcess: 'type'})
+            expect(network.post).toHaveBeenCalledTimes(1)
+            return expect(second).resolves.toBe(cached)
+        })
+    })
+
+    it('does not refetch a completed query until reset', () => {
+        const {cache, network, policy} = createPolicy()
+        network.post.mockResolvedValue(response)
+        cache.read.mockImplementation(() => {
+            throw new Error('cache miss')
+        })
+
+        return policy.process({query, variables, cacheProcess: 'type'}).then(() => {
+            expect(network.post).toHaveBeenCalledTimes(1)
+            return policy.process({query, variables, cacheProcess: 'type'}).then(() => {
+                expect(network.post).toHaveBeenCalledTimes(1)
+            })
+        })
     })
 
     it('deduplicates in-flight network calls', () => {

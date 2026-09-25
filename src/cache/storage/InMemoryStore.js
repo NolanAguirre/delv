@@ -7,6 +7,8 @@ function StoreType() {
 
     const remove = (key) => store[key] = null
 
+    const del = (key) => { delete store[key] }
+
     const merge = (key, node) => {
         store[key] = {...store[key], ...node}
     }
@@ -18,6 +20,7 @@ function StoreType() {
         get,
         set,
         remove,
+        delete: del,
         merge,
         getValues,
         toString
@@ -51,7 +54,16 @@ function InMemoryStore(){
 
     const setAbsolute = (id, node) => store[id] = node
 
-    const removeAbsolute = (id) => store.remove(id)
+    const removeAbsolute = (id) => { delete store[id] }
+
+    const removeType = (type) => { delete store[type] }
+
+    const evict = (id, type) => {
+        const storeType = store[type]
+        if(storeType && storeType.delete){
+            storeType.delete(id)
+        }
+    }
 
     const merge = (id, type, node) => {
         let storeType = store[type]
@@ -75,7 +87,17 @@ function InMemoryStore(){
         return printValue
     }
 
+    const inspect = () => {
+        const result = Object.create(null)
+        Object.keys(store).forEach(key => {
+            const value = store[key]
+            result[key] = value && typeof value.getValues === 'function' ? value.toString() : value
+        })
+        return result
+    }
+
     return{
+        inspect,
         clear,
         get,
         set,
@@ -83,6 +105,8 @@ function InMemoryStore(){
         getAbsolute,
         setAbsolute,
         removeAbsolute,
+        removeType,
+        evict,
         merge,
         toString
     }

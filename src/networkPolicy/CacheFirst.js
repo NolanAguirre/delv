@@ -1,39 +1,30 @@
-class CacheFirst {
-    constructor({cache, network, queryManager}){
-        this.cache = cache
-        this.network = network
-        this.queryManager = queryManager
-    }
+const NetworkFirst = require('./NetworkFirst')
+
+class CacheFirst extends NetworkFirst {
     getName = () => 'cache-first'
 
-    process = ({query, variables, queryId, cacheProcess, ...other}) => {
-        const queryObj = this.queryManager.get({query, variables})
-        if(queryObj.isPending){
-            return queryObj.promise
-        }
-        try{
-            return Promise.resolve(this.cache.read({cacheProcess, query, variables}))
+    getCachedResult = ({query, variables, cacheProcess}) => {
+        if(this.queryManager.get({query, variables}).isMutation) return undefined
+        try {
+            return this.cache.read({query, variables, cacheProcess})
         } catch {
-            queryObj.isPending = true
-            queryObj.promise = this.network.post({query, variables})
-            .then((res)=>{
-                this.cache.write({cacheProcess, data:res.data, ...other})
-                queryObj.isPending = false
-                queryObj.success = true
-                queryObj.fail = false
-                queryObj.promise = null
-                return res.data.data
-            }).catch((error)=>{
-                queryObj.isPending = false
-                queryObj.fail = true
-                queryObj.promise = null
-                throw error
-            })
-            return queryObj.promise
+            return undefined
         }
     }
+
+    // Deliver a synchronous snapshot while the promise represents the final result.
+    process = ({onResult, ...options}) => {
+        const cached = this.getCachedResult(options)
+        if(cached !== undefined && onResult) onResult(cached)
+        const {query, variables} = options
+        const completed = this.queryManager.get({query, variables}).success
+        const promise = completed ? Promise.resolve(cached) : this.fetch(options)
+        if(!onResult || completed) return promise
+        return promise.then(data => {
+            onResult(data)
+            return data
+        })
+    }
 }
-
-
 
 module.exports = CacheFirst

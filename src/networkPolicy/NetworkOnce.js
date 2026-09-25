@@ -1,3 +1,5 @@
+const QueryRequest = require('../network/QueryRequest')
+
 class NetworkOnce {
     constructor({cache, network, queryManager}){
         this.cache = cache
@@ -18,14 +20,14 @@ class NetworkOnce {
 
         }
         queryObj.isPending = true
-        queryObj.promise = this.network.post({query, variables})
+        queryObj.promise = QueryRequest({cache: this.cache, network: this.network, query, variables})
         .then((res)=>{
-            this.cache.write({cacheProcess, data:res.data, ...other})
+            this.cache.write({cacheProcess, data:res.data, query, variables, ...other})
             queryObj.isPending = false
             queryObj.success = true
             queryObj.fail = false
             queryObj.promise = null
-            return res.data.data
+            return res.result
         }).catch((error)=>{
             queryObj.isPending = false
             queryObj.fail = true

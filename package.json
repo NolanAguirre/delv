@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./react": "./src/react/delv-react.js"
+    "./react": "./src/react/delv-react.js",
+    "./debug": "./src/debug/Diagnostics.js",
+    "./debug/react": "./src/debug/DebugPanel.js"
   },
   "scripts": {
     "test": "jest",
@@ -34,7 +36,6 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/networkPolicy/Polling.js",
-      "!src/core/Mutation.js",
       "!src/cache/policy/Query.js",
       "!src/index.js"
     ]
@@ -54,10 +55,10 @@
     }
   },
   "dependencies": {
-    "axios": "^0.21.2",
-    "graphql": "^14.4.2",
+    "axios": "^1.20.0",
+    "graphql": "^15.8.0",
     "graphql-anywhere": "^4.1.24",
-    "graphql-tag": "^2.10.0",
+    "graphql-tag": "^2.12.6",
     "lodash": "^4.17.21"
   },
   "devDependencies": {
