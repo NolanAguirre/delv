@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for cache/index.js</title>
+    <title>Code coverage report for queryManager/QueryKey.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -18,34 +18,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">cache</a> index.js</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">queryManager</a> QueryKey.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -70,33 +70,42 @@
 <a name='L12'></a><a href='#L12'>12</a>
 <a name='L13'></a><a href='#L13'>13</a>
 <a name='L14'></a><a href='#L14'>14</a>
-<a name='L15'></a><a href='#L15'>15</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">746x</span>
+<span class="cline-any cline-yes">735x</span>
+<span class="cline-any cline-yes">358x</span>
+<span class="cline-any cline-yes">428x</span>
+<span class="cline-any cline-yes">428x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">377x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">889x</span>
+<span class="cline-any cline-yes">889x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const Cache = require('./Cache')
-const Emitter = require('./CacheEmitter')
-const Storage = require('./storage/InMemoryStore')
-const Type = require('./policy/Type.js')
-const Query = require('./policy/Query.js')
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const {parse, print} = require('graphql')
 &nbsp;
-module.exports = (typeMap) =&gt; {
-    return new Cache({
-        storage:new Storage(),
-        cacheProcesses:[Type, Query],
-        typeMap,
-        emitter:new Emitter()
-    })
+const stableVariables = value =&gt; {
+    if(Array.isArray(value)) return value.map(stableVariables)
+    if(value &amp;&amp; typeof value === 'object'){
+        return Object.keys(value).sort().reduce((result, key) =&gt; {
+            result[key] = stableVariables(value[key])
+            return result
+        }, {})
+    }
+    return value
+}
+&nbsp;
+module.exports = (query, variables) =&gt; {
+    const varsKey = variables &amp;&amp; Object.keys(variables).length ? JSON.stringify(stableVariables(variables)) : ''
+    return print(parse(query)) + varsKey
 }
 &nbsp;</pre></td></tr></table></pre>
 

@@ -56,8 +56,14 @@ returning `library.books` or recursively expanding the graph.
 
 Inferred collection members are accumulated and deduplicated, preserving books
 already in the library. Both types emit cache updates so subscribed queries
-reread the updated relationships. Explicitly returned collections replace their
-stored membership; an explicitly returned null is preserved.
+reread the updated relationships. Explicitly returned collections are merged
+into their stored membership the same way; an explicitly returned null is
+preserved.
+
+Every list, root or nested, has one membership shared by all queries and
+arguments that select it: a nested list lives on its parent entity, and a root
+list lives on the Query root. Responses only add ids; a delete mutation is the
+only thing that removes them. Each read reproduces its own slice in memory.
 
 References are stored under their GraphQL field names. Reverse inference uses
 an explicit `Delv({reverseReferences: {SourceType: {sourceField: 'inverseField'}}})`
@@ -72,13 +78,13 @@ configuration screen until ambiguous relationships and invalid mappings are
 resolved. Prebuilt JSON maps use the same inference rules without the startup
 screen. Configuration remains separate from the exported schema JSON.
 
-Nested collection reads filter, order, and apply `first`/`offset` to the cached
-members. Both `order_by: {title: asc}` and PostGraphile's `orderBy: TITLE_ASC`
-are supported. Correct slicing requires the relevant members and ordering fields
-to be cached; this cannot reconstruct rows never fetched. Cursor pagination and
-database natural ordering are not maintained by inferred reverse references.
-Top-level recorded server pages retain their existing behavior: their offset is
-not applied a second time.
+List reads filter, order, and apply `first`/`offset` to the cached members.
+Both `order_by: {title: asc}` and PostGraphile's `orderBy: TITLE_ASC` are
+supported. Correct slicing requires the relevant members and ordering fields to
+be cached; this cannot reconstruct rows never fetched, so a page is only right
+once the pages before it are cached. Cursor pagination and database natural
+ordering are not maintained. Use `cacheProcess: 'query'` for true server
+pagination.
 
 ## Connection metadata
 

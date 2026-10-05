@@ -1,4 +1,3 @@
-const axios = require('axios')
 const {parse, print, visit, Kind} = require('graphql')
 
 const addTypenames = (query) => print(visit(parse(query), {
@@ -25,15 +24,19 @@ const addTypenames = (query) => print(visit(parse(query), {
 }))
 
 class AxiosWithErrors {
-    constructor({url}) {
+    constructor({url, httpClient}) {
+        if(!httpClient || typeof httpClient.post !== 'function'){
+            throw new Error('AxiosWithErrors requires an httpClient with a post(url, body) method, such as axios')
+        }
         this.url = url
+        this.httpClient = httpClient
     }
 
     post = ({query, variables}) => {
         console.log('posting to network')
         return new Promise((resolve, reject) => {
             query = addTypenames(query)
-            axios.post(this.url, {
+            this.httpClient.post(this.url, {
                 query,
                 variables
             }).then((res) => {

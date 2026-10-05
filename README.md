@@ -32,7 +32,12 @@ Delv is a factory. You wire together a cache, a query manager, a network
 transport, and the network policy classes you want to support, then call
 `Delv({...})` to get a client.
 
+delv does not bundle an HTTP library. Pass one (such as axios) as `httpClient`
+to `AxiosWithErrors` and to `TypeMap({api})`; it must expose
+`post(url, body)` resolving to a response with a `data` property.
+
 ```js
+const axios = require('axios')
 const {
   Delv,
   createCache,
@@ -52,7 +57,7 @@ const typeMap = TypeMap({typeMap: require('./typemap.json')})
 const delv = Delv({
   cache: createCache(typeMap),
   queryManager: new QueryManager(),
-  network: new AxiosWithErrors({url: 'https://example.com/graphql'}),
+  network: new AxiosWithErrors({url: 'https://example.com/graphql', httpClient: axios}),
   networkPolicies: [CacheOnly, CacheFirst, NetworkFirst, NetworkOnly, NetworkOnce],
   defaults: {
     networkPolicy: 'cache-first',
@@ -75,7 +80,7 @@ normalize nodes. It supports two modes:
 promise that resolves to the built map:
 
 ```js
-TypeMap({api: 'https://example.com/graphql'}).then((map) => {
+TypeMap({api: 'https://example.com/graphql', httpClient: axios}).then((map) => {
   // persist `map` (e.g. JSON.stringify) to ship as a prebuilt typemap
 })
 ```
@@ -409,9 +414,9 @@ const data = await delv.mutate({
 })
 ```
 
-`refetchQueries` covers cases the mutation response can't express — deletes and
-list-membership changes, where the normalized write alone can't tell an existing
-query that a node was added to or removed from a list. Each entry accepts
+`refetchQueries` covers cases the mutation response can't express, such as a
+node joining a list the normalized write can't link it to. A refetch only adds
+to list membership; nodes leave lists only through a delete mutation. Each entry accepts
 `{query, variables, networkPolicy, cacheProcess}` and defaults to
 `network-only`. Refetches run after the mutation resolves; a failing refetch is
 swallowed so it never masks an otherwise successful mutation.

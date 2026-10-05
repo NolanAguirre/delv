@@ -1,6 +1,7 @@
 // delv's entry is CommonJS; importing the default gives module.exports, which
 // avoids relying on the bundler's (flaky) CJS named-export detection.
 import delv from 'delv'
+import axios from 'axios'
 
 const {
     Delv,
@@ -22,11 +23,11 @@ const GRAPHQL_URL = '/graphql'
 const createClient = async () => {
     // The async (api) branch of TypeMap resolves the raw introspection map;
     // feed it back in synchronously to get the queryable TypeMap interface.
-    const map = await TypeMap({api: GRAPHQL_URL})
+    const map = await TypeMap({api: GRAPHQL_URL, httpClient: axios})
     const typeMap = TypeMap({typeMap: map})
     const cache = createCache(typeMap)
     const queryManager = new QueryManager()
-    const network = new AxiosWithErrors({url: GRAPHQL_URL})
+    const network = new AxiosWithErrors({url: GRAPHQL_URL, httpClient: axios})
 
     return Delv({
         cache,

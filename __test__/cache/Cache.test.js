@@ -76,18 +76,20 @@ beforeAll(() => {
 })
 
 describe('Cache unit test', () => {
-    it('uses full query identity and stable variables for collection membership, including empty results', () => {
+    it('shares one membership per root field across queries and variables, including empty results', () => {
         const cache = Cache(typeMap)
         const query = 'query Books { allBooks { nodes { id } } }'
         const other = 'query Books { allBooks(first: 1) { nodes { id } } }'
         cache.write({cacheProcess: 'type', query, variables: {a: 1, b: 2}, data: {
             data: {allBooks: {nodes: []}}
         }})
+        expect(cache.read({cacheProcess: 'type', query, variables: {b: 2, a: 1}}))
+            .toEqual({allBooks: {nodes: []}})
         cache.write({cacheProcess: 'type', query: other, variables: {a: 1, b: 2}, data: {
             data: {allBooks: {nodes: [{__typename: 'Book', id: 'b1'}]}}
         }})
         expect(cache.read({cacheProcess: 'type', query, variables: {b: 2, a: 1}}))
-            .toEqual({allBooks: {nodes: []}})
+            .toEqual({allBooks: {nodes: [{id: 'b1'}]}})
         expect(cache.read({cacheProcess: 'type', query: other, variables: {b: 2, a: 1}}))
             .toEqual({allBooks: {nodes: [{id: 'b1'}]}})
     })
@@ -244,7 +246,7 @@ describe('Cache unit test', () => {
         })
     })
 
-    it('replays a collection query membership so refetches drop removed rows', () => {
+    it('replays a collection query membership and keeps rows a refetch omits', () => {
         const cache = Cache(typeMap)
         const query = `
         query GetBooks {
@@ -283,10 +285,10 @@ describe('Cache unit test', () => {
         }})
 
         expect(cache.read({cacheProcess: 'type', query}).allBooks.nodes)
-            .toEqual([{ id: 'b1', title: 'Dune' }])
+            .toEqual([{ id: 'b1', title: 'Dune' }, { id: 'b2', title: 'Hyperion' }])
     })
 
-    it('scopes collection membership by variables', () => {
+    it('applies each read\'s first to the shared membership', () => {
         const cache = Cache(typeMap)
         const query = `
         query GetBooks($first: Int) {
@@ -306,6 +308,24 @@ describe('Cache unit test', () => {
 
         expect(cache.read({cacheProcess: 'type', query, variables: {first: 1}}).allBooks.nodes).toEqual([{ id: 'b1' }])
         expect(cache.read({cacheProcess: 'type', query, variables: {first: 2}}).allBooks.nodes).toEqual([{ id: 'b1' }, { id: 'b2' }])
+    })
+
+    it('keeps every condition slice of a root list', () => {
+        const cache = Cache(typeMap)
+        const query = `query Books($archived: Boolean) {
+            allBooks(condition: {archived: $archived}) { nodes { id archived } }
+        }`
+        const write = (archived, nodes) => cache.write({cacheProcess: 'type', query, variables: {archived}, data: {
+            data: {allBooks: {nodes}}
+        }})
+        const read = (archived) => cache.read({cacheProcess: 'type', query, variables: {archived}}).allBooks.nodes
+        write(false, [{__typename: 'Book', id: 'b1', archived: false}])
+        write(true, [])
+        expect(read(false)).toEqual([{id: 'b1', archived: false}])
+        expect(read(true)).toEqual([])
+        write(true, [{__typename: 'Book', id: 'b2', archived: true}])
+        expect(read(false)).toEqual([{id: 'b1', archived: false}])
+        expect(read(true)).toEqual([{id: 'b2', archived: true}])
     })
 
     it('applies a condition on read', () => {
@@ -414,35 +434,31 @@ describe('Cache unit test', () => {
     })
 
     it.each(['nodes { id }', 'edges { node { id } }'])(
-        'replays a server page without applying its offset again: %s', (selection) => {
+        'pages the merged membership in memory: %s', (selection) => {
             const cache = Cache(typeMap)
             const query = `query Page($first: Int, $offset: Int) {
                 allBooks(first: $first, offset: $offset) { ${selection} }
             }`
-            const variables = {first: 2, offset: 2}
-            const nodes = [
-                {__typename: 'Book', id: 'b3'},
-                {__typename: 'Book', id: 'b4'}
-            ]
-            const connection = selection.startsWith('edges')
-                ? {edges: nodes.map((node) => ({node}))}
-                : {nodes}
-            cache.write({cacheProcess: 'type', query, variables, data: {
-                data: {allBooks: connection}
+            const connection = (ids) => {
+                const nodes = ids.map((id) => ({__typename: 'Book', id}))
+                return selection.startsWith('edges') ? {edges: nodes.map((node) => ({node}))} : {nodes}
+            }
+            const expected = (ids) => (selection.startsWith('edges')
+                ? {edges: ids.map((id) => ({node: {id}}))}
+                : {nodes: ids.map((id) => ({id}))})
+            const write = (variables, ids) => cache.write({cacheProcess: 'type', query, variables, data: {
+                data: {allBooks: connection(ids)}
             }})
+            const read = (variables) => cache.read({cacheProcess: 'type', query, variables}).allBooks
 
-            const expected = selection.startsWith('edges')
-                ? {edges: [{node: {id: 'b3'}}, {node: {id: 'b4'}}]}
-                : {nodes: [{id: 'b3'}, {id: 'b4'}]}
-            expect(cache.read({cacheProcess: 'type', query, variables}).allBooks)
-                .toEqual(expected)
+            write({first: 2, offset: 0}, ['b1', 'b2'])
+            write({first: 2, offset: 2}, ['b3', 'b4'])
+            expect(read({first: 2, offset: 0})).toEqual(expected(['b1', 'b2']))
+            expect(read({first: 2, offset: 2})).toEqual(expected(['b3', 'b4']))
 
-            // A refetch can authoritatively replace the page with an empty one.
-            cache.write({cacheProcess: 'type', query, variables, data: {
-                data: {allBooks: selection.startsWith('edges') ? {edges: []} : {nodes: []}}
-            }})
-            expect(cache.read({cacheProcess: 'type', query, variables}).allBooks)
-                .toEqual(selection.startsWith('edges') ? {edges: []} : {nodes: []})
+            // Only delete mutations remove rows, so an empty refetch keeps the page.
+            write({first: 2, offset: 2}, [])
+            expect(read({first: 2, offset: 2})).toEqual(expected(['b3', 'b4']))
         }
     )
 
@@ -466,5 +482,120 @@ describe('Cache unit test', () => {
         })
 
         expect(result.allBooks.nodes).toEqual([{ id: 'b2' }])
+    })
+})
+
+describe('Cache list fields', () => {
+    const listTypeMap = () => TypeMap({typeMap: {
+        Query: { assetById: 'Asset', allAssetTags: 'AssetTag' },
+        Asset: { tags: 'AssetTag', tagConnection: 'AssetTag' },
+        AssetTag: {},
+        __fieldTypes: {
+            Query: { assetById: 'Asset', allAssetTags: '[AssetTag!]!' },
+            Asset: { id: 'UUID!', tags: '[AssetTag!]!', tagConnection: 'AssetTagsConnection!' },
+            AssetTag: { id: 'String!', category: 'String!', name: 'String!', score: 'Float!' }
+        }
+    }})
+
+    const tags = [
+        { __typename: 'AssetTag', id: 't1', category: 'style', name: 'noir', score: 0.9 },
+        { __typename: 'AssetTag', id: 't2', category: 'subject', name: 'city', score: 0.8 },
+        { __typename: 'AssetTag', id: 't3', category: 'style', name: 'grain', score: 0.4 }
+    ]
+
+    const assetQuery = `
+    query AssetTags($id: UUID!) {
+        assetById(id: $id) {
+            id
+            tags {
+                id
+                category
+                name
+                score
+            }
+        }
+    }
+    `
+
+    const writeAsset = (cache, assetTags, query = assetQuery) => {
+        cache.write({cacheProcess: 'type', query, variables: {id: 'a1'}, data: {
+            data: { assetById: { __typename: 'Asset', id: 'a1', tags: assetTags } }
+        }})
+    }
+
+    it('reads a nested list field back as a list, not a single node', () => {
+        const cache = Cache(listTypeMap())
+        writeAsset(cache, tags)
+
+        const result = cache.read({cacheProcess: 'type', query: assetQuery, variables: {id: 'a1'}})
+
+        expect(result.assetById.tags).toEqual(tags.map(({__typename, ...tag}) => tag))
+    })
+
+    it('reads an empty nested list field back as an empty list', () => {
+        const cache = Cache(listTypeMap())
+        writeAsset(cache, [])
+
+        const result = cache.read({cacheProcess: 'type', query: assetQuery, variables: {id: 'a1'}})
+
+        expect(result.assetById.tags).toEqual([])
+    })
+
+    it('applies arguments to a nested list field', () => {
+        const cache = Cache(listTypeMap())
+        const query = `
+        query AssetTags($id: UUID!) {
+            assetById(id: $id) {
+                id
+                tags(condition: {category: "style"}, orderBy: SCORE_ASC) {
+                    id
+                }
+            }
+        }
+        `
+        writeAsset(cache, tags, query)
+
+        const result = cache.read({cacheProcess: 'type', query, variables: {id: 'a1'}})
+
+        expect(result.assetById.tags).toEqual([{ id: 't3' }, { id: 't1' }])
+    })
+
+    it('keeps a connection-typed field readable through nodes', () => {
+        const cache = Cache(listTypeMap())
+        const query = `
+        query AssetTags($id: UUID!) {
+            assetById(id: $id) {
+                id
+                tagConnection {
+                    nodes {
+                        id
+                    }
+                }
+            }
+        }
+        `
+        cache.write({cacheProcess: 'type', query, variables: {id: 'a1'}, data: {
+            data: { assetById: { __typename: 'Asset', id: 'a1', tagConnection: {
+                __typename: 'AssetTagsConnection', nodes: tags
+            } } }
+        }})
+
+        const result = cache.read({cacheProcess: 'type', query, variables: {id: 'a1'}})
+
+        expect(result.assetById.tagConnection).toEqual({ nodes: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] })
+    })
+
+    it('reads a root list field back as a list from recorded membership and the type bucket', () => {
+        const cache = Cache(listTypeMap())
+        const query = 'query Tags { allAssetTags { id name } }'
+        cache.write({cacheProcess: 'type', query, data: { data: { allAssetTags: tags.slice(0, 2) } }})
+
+        expect(cache.read({cacheProcess: 'type', query}).allAssetTags)
+            .toEqual([{ id: 't1', name: 'noir' }, { id: 't2', name: 'city' }])
+
+        cache.write({cacheProcess: 'type', data: { data: { allAssetTags: tags } }})
+        const filtered = 'query StyleTags { allAssetTags(condition: {category: "style"}, first: 1) { id } }'
+
+        expect(cache.read({cacheProcess: 'type', query: filtered}).allAssetTags).toEqual([{ id: 't1' }])
     })
 })

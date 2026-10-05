@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 
 const colors = {background: '#10151f', color: '#dce4f2', border: '1px solid #344054'}
 const button = {...colors, borderRadius: 5, padding: '5px 9px', font: 'inherit', cursor: 'pointer'}
@@ -18,9 +18,50 @@ const read = sidecar => {
     catch(error) { return {events: sidecar.getEvents(), cache: {error: error.message}} }
 }
 
+const edge = 8
+const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max))
+const withinScreen = (left, top, width, height) => ({
+    left: clamp(left, edge, window.innerWidth - width - edge),
+    top: clamp(top, edge, window.innerHeight - height - edge),
+})
+
+const useDrag = () => {
+    const rootRef = useRef(null)
+    const dragRef = useRef({stop: null})
+    const [pos, setPos] = useState(null)
+    useEffect(() => () => { if(dragRef.current.stop) dragRef.current.stop() }, [])
+    const onPointerDown = event => {
+        if(event.button !== 0 || typeof window === 'undefined') return
+        const closest = event.target && event.target.closest
+        const interactive = closest ? event.target.closest('button, input, select, textarea, a') : null
+        if(interactive && interactive !== event.currentTarget) return
+        const node = rootRef.current && rootRef.current.getBoundingClientRect ? rootRef.current : event.currentTarget
+        if(!node || !node.getBoundingClientRect) return
+        const rect = node.getBoundingClientRect()
+        const startX = event.clientX
+        const startY = event.clientY
+        const previousCursor = document.body.style.cursor
+        document.body.style.cursor = 'grabbing'
+        const move = e => {
+            setPos(withinScreen(rect.left + e.clientX - startX, rect.top + e.clientY - startY, rect.width, rect.height))
+        }
+        const stop = () => {
+            document.body.style.cursor = previousCursor
+            window.removeEventListener('pointermove', move)
+            window.removeEventListener('pointerup', stop)
+            dragRef.current.stop = null
+        }
+        dragRef.current.stop = stop
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', stop)
+    }
+    return {rootRef, pos, onPointerDown}
+}
+
 // UI subscribes to the sidecar, never to the Delv client.
 const DelvDebugPanel = ({sidecar, enabled = false, defaultOpen = false, side = 'right'}) => {
     const [open, setOpen] = useState(defaultOpen)
+    const {rootRef, pos, onPointerDown} = useDrag()
     const [tab, setTab] = useState('events')
     const [paused, setPaused] = useState(false)
     const [filter, setFilter] = useState('all')
@@ -38,12 +79,17 @@ const DelvDebugPanel = ({sidecar, enabled = false, defaultOpen = false, side = '
         return () => { unsubscribe(); clearTimeout(timer) }
     }, [sidecar, enabled, paused])
     if(!enabled || !sidecar) return null
-    const position = {position: 'fixed', bottom: 16, [side === 'left' ? 'left' : 'right']: 16, zIndex: 2147483646, font: '12px/1.5 ui-monospace, monospace'}
+    const position = pos
+        ? {position: 'fixed', left: pos.left, top: pos.top, zIndex: 2147483646, font: '12px/1.5 ui-monospace, monospace'}
+        : {position: 'fixed', bottom: 16, [side === 'left' ? 'left' : 'right']: 16, zIndex: 2147483646, font: '12px/1.5 ui-monospace, monospace'}
     if(!open) return <button type="button" style={{...button, ...position}} onClick={() => setOpen(true)}>delv · debug</button>
     const matching = view.events.filter(event => (filter === 'all' || event.kind.startsWith(filter)) && JSON.stringify(event).toLowerCase().includes(search.toLowerCase()))
     const buckets = Object.entries(view.cache || {}).filter(([key, value]) => `${key} ${JSON.stringify(value)}`.toLowerCase().includes(search.toLowerCase()))
-    return <section aria-label="Delv debug panel" style={{...colors, ...position, width: 600, height: 460, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)', minWidth: 260, minHeight: 200, resize: 'both', overflow: 'hidden', borderRadius: 10, boxShadow: '0 16px 60px #0008', display: 'flex', flexDirection: 'column', textAlign: 'left'}}>
+    return <section ref={rootRef} aria-label="Delv debug panel" style={{...colors, ...position, width: 600, height: 460, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)', minWidth: 260, minHeight: 200, resize: 'both', overflow: 'hidden', borderRadius: 10, boxShadow: '0 16px 60px #0008', display: 'flex', flexDirection: 'column', textAlign: 'left'}}>
         <header style={{display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderBottom: colors.border}}>
+            <svg aria-label="Drag debug panel" width="14" height="18" viewBox="0 0 14 18" onPointerDown={onPointerDown} style={{cursor: 'grab', touchAction: 'none', flexShrink: 0}}>
+                {[0, 1, 2].map(row => [0, 1].map(col => <circle key={`${row}-${col}`} cx={4 + col * 6} cy={4 + row * 5} r="1.4" fill="#8392aa" />))}
+            </svg>
             <strong style={{flex: 1}}>delv <span style={{color: '#8392aa', fontWeight: 400}}>/ internals</span></strong>
             <span style={{color: paused ? '#f5cc7a' : '#78ddb0'}}>{paused ? 'Paused view' : 'Live'}</span>
             <button type="button" style={button} aria-label="Collapse debug panel" onClick={() => setOpen(false)}>Collapse</button>

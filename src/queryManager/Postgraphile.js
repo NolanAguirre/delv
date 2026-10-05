@@ -68,7 +68,7 @@ const INTROSPECTION_QUERY =
 `
 
 
-function TypeMap({typeMap, api, fields = {}, keys = {}}) {
+function TypeMap({typeMap, api, httpClient, fields = {}, keys = {}}) {
     let map
 
 
@@ -271,9 +271,11 @@ function TypeMap({typeMap, api, fields = {}, keys = {}}) {
             }
         })
     }else{
+        if(!httpClient || typeof httpClient.post !== 'function'){
+            return Promise.reject(new Error('TypeMap({api}) requires an httpClient with a post(url, body) method, such as axios'))
+        }
         return new Promise((resolve, reject)=>{
-            const axios = require('axios')
-            axios.post(api, {query:INTROSPECTION_QUERY})
+            httpClient.post(api, {query:INTROSPECTION_QUERY})
             .then((res) => {
                 resolve(_loadIntrospection(res.data.data))
             }).catch((error) => {

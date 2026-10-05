@@ -36,6 +36,21 @@ describe('NetworkOnce', () => {
             })
     })
 
+    it('exposes a synchronous cache hit only after the first success', () => {
+        const {cache, network, policy} = createPolicy()
+        const cached = {user: {id: '1', name: 'Nolan'}}
+        network.post.mockResolvedValue(response)
+        cache.read.mockReturnValue(cached)
+        const options = {query, variables, cacheProcess: 'type'}
+
+        expect(policy.getCachedResult(options)).toBeUndefined()
+
+        return policy.process(options).then(() => {
+            expect(policy.getCachedResult(options)).toBe(cached)
+            expect(network.post).toHaveBeenCalledTimes(1)
+        })
+    })
+
     it('reads from cache after the first successful network call', () => {
         const {cache, network, policy} = createPolicy()
         const cached = {user: {id: '1', name: 'Nolan'}}

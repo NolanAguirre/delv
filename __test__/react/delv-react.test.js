@@ -7,9 +7,10 @@ const createDelv = require('../../src/core/delv')
 const QueryManager = require('../../src/queryManager/QueryManager')
 const CacheFirst = require('../../src/networkPolicy/CacheFirst')
 const NetworkFirst = require('../../src/networkPolicy/NetworkFirst')
+const NetworkOnce = require('../../src/networkPolicy/NetworkOnce')
 
 describe('real query policy rendering', () => {
-    it.each(['cache-first', 'network-first'])('renders cached %s data synchronously on mount and variable changes', async networkPolicy => {
+    it.each(['cache-first', 'network-first', 'network-once'])('renders cached %s data synchronously on mount and variable changes', async networkPolicy => {
         const values = {a: {user: {id: 'a'}}, b: {user: {id: 'b'}}}
         const cache = {
             read: ({variables}) => values[variables.id],
@@ -17,8 +18,8 @@ describe('real query policy rendering', () => {
         }
         const requests = []
         const network = {post: jest.fn(() => new Promise(resolve => requests.push(resolve)))}
-        const client = createDelv({cache, network, queryManager: new QueryManager(), networkPolicies: [CacheFirst, NetworkFirst]})
-        if(networkPolicy === 'network-first'){
+        const client = createDelv({cache, network, queryManager: new QueryManager(), networkPolicies: [CacheFirst, NetworkFirst, NetworkOnce]})
+        if(networkPolicy === 'network-first' || networkPolicy === 'network-once'){
             for(const id of ['a', 'b']){
                 const pending = client.query({query, variables: {id}, networkPolicy})
                 requests[requests.length - 1]({data: {data: values[id]}})

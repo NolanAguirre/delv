@@ -5,11 +5,12 @@ const { applyWhere, applyCondition, applyOrderBy, applySlice } = require('../Fil
 
 const CURSOR = '__cursor'
 const COLLECTION_PREFIX = '@@delv/collection:'
+const LIST_PREFIX = '@@delv/list:'
 
 function CacheByType({emitter, storage, typeMap, reverseReferences = require('../ReverseReferences')(typeMap), mutationActions = require('../MutationActions')()}){
 
-    // collectionKey -> childType for every top-level collection whose membership
-    // (the ordered set of ids it returned) has been recorded. Lets mutations
+    // listKey -> childType for every root list field whose membership (the
+    // ordered set of ids it has returned) has been recorded. Lets mutations
     // maintain that membership without scanning opaque storage.
     const collections = new Map()
     const keyOf = (type) => typeMap.getKey ? typeMap.getKey(type) : 'id'
@@ -158,6 +159,10 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
         COLLECTION_PREFIX + queryKey(query, variables) + ':' + fieldName
     )
 
+    // Root lists behave like a list field on the Query root: one membership
+    // per field, shared by every argument set and filtered in memory.
+    const listKey = (fieldName) => LIST_PREFIX + fieldName
+
     const access = {
         getKey: (node) => node[keyOf(node.__typename)],
         getType: (node, field) => typeMap.getFields ? typeMap.getFields(node.__typename)[field] : undefined,
@@ -172,6 +177,22 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
         }
     }
 
+    const filterNodes = (nodes, args) => {
+        if(!args) return nodes
+        let value = applyCondition(nodes, args.condition)
+        value = applyWhere(value, args.where, access)
+        value = applyWhere(value, args.filter, access)
+        value = applyOrderBy(value, args.order_by || args.orderBy, access)
+        return applySlice(value, args.first, args.offset)
+    }
+
+    // Only a schema list signature (e.g. `[AssetTag!]!`) proves a bare list.
+    // Connections and legacy relationship-only maps keep the wrapper.
+    const isList = (type, field) => {
+        const signature = typeMap.getFieldType ? typeMap.getFieldType(type, field) : undefined
+        return typeof signature === 'string' && signature.startsWith('[')
+    }
+
     const read = ({query, variables}) => {
         const resolver = (fieldName, root, args, context, info) => {
             if(fieldName === '__typename'){
@@ -182,19 +203,18 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
                 const type = typeMap.getTypeDefinition('Query')
                 const childType = type[fieldName]
                 const metadata = connectionCounts.read({query, variables}, null, fieldName, args)
-                // Prefer this query's recorded membership so refetches are
-                // authoritative (dropped rows disappear, order is preserved,
-                // and server-side filtering like `condition` is respected).
-                const membership = storage.getAbsolute(collectionKey(context.queryString, context.variables, fieldName))
-                if(membership != null){
-                    const bucket = storage.get(childType)
-                    if(!Array.isArray(membership)) return bucket && bucket.get(membership)
+                const bucket = storage.get(childType)
+                const entity = storage.getAbsolute(collectionKey(context.queryString, context.variables, fieldName))
+                if(entity != null) return bucket && bucket.get(entity)
+                // Only delete mutations remove ids from a recorded membership.
+                const membership = storage.getAbsolute(listKey(fieldName))
+                if(Array.isArray(membership)){
                     const nodes = membership
                         .map((id) => (bucket ? bucket.get(id) : undefined))
                         .filter((node) => node != null)
-                    return {...metadata, getValues: () => nodes, isServerPage: true, connectionArgs: args}
+                    if(isList('Query', fieldName)) return filterNodes(nodes, args)
+                    return {...metadata, getValues: () => nodes, connectionArgs: args}
                 }
-                const bucket = storage.get(childType)
                 if(!bucket && metadata.totalCount !== undefined) return metadata
                 if(!bucket){
                     // Nothing of this type has ever been cached: signal a miss so
@@ -202,6 +222,7 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
                     // resolving to an empty result.
                     throw new Error(`delv cache miss: no cached "${childType}" for query field "${fieldName}"`)
                 }
+                if(isList('Query', fieldName)) return filterNodes(bucket.getValues(), args)
                 return {...metadata, getValues: bucket.getValues, connectionArgs: args}
             }
 
@@ -212,16 +233,7 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
                     value = root.getValues()
                 }
                 if(root && root.connectionArgs){
-                    const { where, filter, condition, order_by, orderBy, first, offset } = root.connectionArgs
-                    value = applyCondition(value, condition)
-                    value = applyWhere(value, where, access)
-                    value = applyWhere(value, filter, access)
-                    value = applyOrderBy(value, order_by || orderBy, access)
-                    // Recorded membership already contains the server's page.
-                    // Only paginate when reconstructing from the type bucket.
-                    if(!root.isServerPage){
-                        value = applySlice(value, first, offset)
-                    }
+                    value = filterNodes(value, root.connectionArgs)
                 }
                 return value
             }
@@ -244,16 +256,10 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
             const metadata = connectionCounts.read({query, variables}, root, fieldName, args)
             if(root[fieldName] instanceof Array){
                 const childChoices = storage.get(childType)
-                let nodes = root[fieldName]
+                const nodes = filterNodes(root[fieldName]
                     .map((id) => childChoices && childChoices.get(id))
-                    .filter((node) => node != null)
-                if(args){
-                    nodes = applyCondition(nodes, args.condition)
-                    nodes = applyWhere(nodes, args.where, access)
-                    nodes = applyWhere(nodes, args.filter, access)
-                    nodes = applyOrderBy(nodes, args.order_by || args.orderBy, access)
-                    nodes = applySlice(nodes, args.first, args.offset)
-                }
+                    .filter((node) => node != null), args)
+                if(isList(rootType, fieldName)) return nodes
                 // Return a connection-shaped wrapper (not a bare array) so the
                 // nested `nodes`/`edges` selection resolves once against the list
                 // instead of graphql-anywhere mapping the array element-by-element.
@@ -298,6 +304,18 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
         }
         if(node && node.__typename && node.__typename.endsWith('Connection') && node.totalCount !== undefined) return undefined
         return cacheNode({node, ...other})
+    }
+
+    // Nested lists are shared by every query that selects them, whatever its
+    // arguments, so each response adds ids and reads filter in memory.
+    const unionIds = (existing, incoming) => {
+        const ids = Array.isArray(existing) ? [...existing] : []
+        incoming.forEach((id) => {
+            if(id != null && !ids.some((member) => String(member) === String(id))){
+                ids.push(id)
+            }
+        })
+        return ids
     }
 
     const cacheNode = ({node, parent, parentIsCollection = false, parentField, seen = new Set(), ...other}) => {
@@ -350,6 +368,8 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
 
         // shallow clone so the network response is never mutated in place
         const cached = {...node}
+        const bucket = storage.get(type)
+        const previous = (bucket && bucket.get(id)) || {}
 
         for(let key in typeDefinition){
             const value = node[key]
@@ -358,6 +378,7 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
             }
             const reference = cacheUnknown({node:value, parent:node, parentField:key, seen, ...other})
             if(reference === undefined) delete cached[key]
+            else if(Array.isArray(reference)) cached[key] = unionIds(previous[key], reference)
             else cached[key] = reference
         }
 
@@ -386,11 +407,8 @@ function CacheByType({emitter, storage, typeMap, reverseReferences = require('..
             }else if(action === 'query' && query !== undefined && value && value[keyOf(value.__typename)] != null){
                 storage.setAbsolute(collectionKey(query, variables, key), cached)
             }else if(query !== undefined && cached instanceof Array){
-                // Record which ids a top-level collection returned so reads for
-                // this exact query+variables replay that set (handles deletes,
-                // ordering, and server-side filtering the by-type cache cannot).
-                const key0 = collectionKey(query, variables, key)
-                storage.setAbsolute(key0, cached)
+                const key0 = listKey(key)
+                storage.setAbsolute(key0, unionIds(storage.getAbsolute(key0), cached))
                 // Mark the collection's type changed so subscribers re-read
                 // even when the result is now empty (nothing was cacheNode'd).
                 const queryDef = typeMap.getTypeDefinition('Query') || {}

@@ -2,15 +2,14 @@ import React from 'react'
 import TestRenderer, {act} from 'react-test-renderer'
 import {DelvProvider} from '../../src/react/delv-react'
 const {TypeMap, createCache, Delv} = require('../../src')
-jest.mock('axios')
-const axios = require('axios')
+const axios = {post: jest.fn()}
 
 const field = (name, type) => ({name, type: {kind: 'OBJECT', name: type}})
 const createClient = async reverseReferences => {
     axios.post.mockResolvedValue({data: {data: {__schema: {types: [
         {name: 'User', fields: [field('manager', 'User')]}
     ]}}}})
-    const map = await TypeMap({api: '/graphql'})
+    const map = await TypeMap({api: '/graphql', httpClient: axios})
     return Delv({cache: createCache(TypeMap({typeMap: map})), network: {}, queryManager: {},
         networkPolicies: [], reverseReferences})
 }

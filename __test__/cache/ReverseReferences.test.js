@@ -62,19 +62,36 @@ describe('reverse references', () => {
         }
     )
 
-    it('preserves a known empty collection and explicit null relationships', () => {
+    it('merges an empty nested collection and preserves explicit null relationships', () => {
         const cache = setup()
         cache.write({cacheProcess: 'type', data: {data: {
             library: {__typename: 'Library', id: 'l1', books: {nodes: []}}
         }}})
         createBook(cache, 'b2', 'Alpha')
-        expect(books(cache).map((book) => book.id)).toEqual(['b2'])
+        expect(books(cache).map((book) => book.id)).toEqual(['b1', 'b2'])
         cache.write({cacheProcess: 'type', data: {data: {
             library: {__typename: 'Library', id: 'l1', books: {nodes: [
                 {__typename: 'Book', id: 'b2', title: 'Alpha', libraryById: null}
             ]}}
         }}})
-        expect(books(cache)[0].libraryById).toBeNull()
+        expect(books(cache).find((book) => book.id === 'b2').libraryById).toBeNull()
+    })
+
+    it('keeps every condition slice of a nested collection', () => {
+        const cache = Cache(TypeMap({typeMap: map}))
+        const shelf = (archived) => `{ allLibraries { nodes {
+            id books(condition: {archived: ${archived}}) { nodes { id archived } }
+        } } }`
+        const write = (archived, nodes) => cache.write({cacheProcess: 'type', query: shelf(archived), data: {data: {
+            allLibraries: {nodes: [{__typename: 'Library', id: 'l1', books: {nodes}}]}
+        }}})
+        write(false, [{__typename: 'Book', id: 'b1', archived: false}])
+        write(true, [])
+        expect(books(cache, shelf(false))).toEqual([{id: 'b1', archived: false}])
+        expect(books(cache, shelf(true))).toEqual([])
+        write(true, [{__typename: 'Book', id: 'b2', archived: true}])
+        expect(books(cache, shelf(false))).toEqual([{id: 'b1', archived: false}])
+        expect(books(cache, shelf(true))).toEqual([{id: 'b2', archived: true}])
     })
 
     it('handles finite selections that revisit the same entity', () => {

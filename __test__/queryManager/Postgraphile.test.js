@@ -7,9 +7,7 @@
  * below then re-derives __fixtures__/typemap.json from it.
  */
 
-jest.mock('axios')
-
-const axios = require('axios')
+const axios = {post: jest.fn()}
 const TypeMap = require('../../src/queryManager/Postgraphile')
 const introspection = require('./__fixtures__/introspection.json')
 const typemap = require('./__fixtures__/typemap.json')
@@ -37,7 +35,7 @@ describe('Postgraphile TypeMap', () => {
     it('derives the committed typemap from the introspection fixture', () => {
         mockIntrospection(introspection)
 
-        return TypeMap({api: 'http://fixture/graphql'}).then(({__fields, ...relationships}) => {
+        return TypeMap({api: 'http://fixture/graphql', httpClient: axios}).then(({__fields, ...relationships}) => {
             expect(relationships).toEqual({...typemap, TermEdge: {
                 termNodeByFromNode: 'TermNode', termNodeByToNode: 'TermNode',
                 termNodeRelationshipByRelationship: 'TermNodeRelationship'
@@ -64,7 +62,7 @@ describe('Postgraphile TypeMap', () => {
             }
         ])
 
-        return TypeMap({api: 'http://fixture/graphql'}).then((map) => {
+        return TypeMap({api: 'http://fixture/graphql', httpClient: axios}).then((map) => {
             expect(map.Account.membersByAccountId).toBe('AccountMember')
         })
     })
@@ -108,7 +106,7 @@ describe('Postgraphile TypeMap', () => {
             }
         ])
 
-        return TypeMap({api: 'http://fixture/graphql'}).then((map) => {
+        return TypeMap({api: 'http://fixture/graphql', httpClient: axios}).then((map) => {
             expect(Object.keys(map).filter((key) => key !== '__fields')).toEqual(['Account'])
             expect(map.AccountsEdge).toBeUndefined()
             expect(map.CreateAccountPayload).toBeUndefined()
@@ -132,7 +130,7 @@ describe('Postgraphile TypeMap', () => {
             }
         ])
 
-        return TypeMap({api: 'http://fixture/graphql'}).then((map) => {
+        return TypeMap({api: 'http://fixture/graphql', httpClient: axios}).then((map) => {
             expect(map.Account).toEqual({ownerByOwnerId: 'User'})
         })
     })
@@ -149,7 +147,7 @@ describe('Postgraphile TypeMap', () => {
             }
         ])
 
-        return TypeMap({api: 'http://fixture/graphql'}).then((map) => {
+        return TypeMap({api: 'http://fixture/graphql', httpClient: axios}).then((map) => {
             expect(map.Account).toEqual({
                 ownerByOwnerId: 'User',
                 creatorByCreatedBy: 'User'
@@ -222,7 +220,7 @@ it('retains scalar/wrapped field metadata and mutation payloads when introspecti
         {name: 'Mutation', fields: [{name: 'moveBook', type: {name: 'MoveBookPayload'}}]},
         {name: 'MoveBookPayload', fields: [{name: 'book', type: {name: 'Book'}}]}
     ])
-    const map = await TypeMap({api: '/graphql'})
+    const map = await TypeMap({api: '/graphql', httpClient: axios})
     const hydrated = TypeMap({typeMap: JSON.parse(JSON.stringify(map))})
     expect(hydrated.getFields('Book').position).toBe('BigFloat')
     expect(hydrated.getFields('BooksConnection').nodes).toBe('Book')
@@ -261,7 +259,7 @@ describe('cache keys', () => {
 
     it('detects a single-column lookup as the key and leaves id types alone', async () => {
         mockTypes(types())
-        const map = await TypeMap({api: '/graphql'})
+        const map = await TypeMap({api: '/graphql', httpClient: axios})
         expect(map.__keys).toEqual({EntityType: 'type'})
         expect(logSpy).not.toHaveBeenCalled()
         const hydrated = TypeMap({typeMap: JSON.parse(JSON.stringify(map))})
@@ -272,27 +270,27 @@ describe('cache keys', () => {
     it('logs and sets no key when a type has more than one single-column lookup', async () => {
         mockTypes(types([lookup('fooByA', 'Foo', ['a', 'String']), lookup('fooByB', 'Foo', ['b', 'String'])],
             [{name: 'Foo', fields: [field('a', nonNull(scalar('String'))), field('b', nonNull(scalar('String')))]}]))
-        const map = await TypeMap({api: '/graphql'})
+        const map = await TypeMap({api: '/graphql', httpClient: axios})
         expect(map.__keys).toEqual({EntityType: 'type'})
         expect(logSpy).toHaveBeenCalledWith('delv: Foo has multiple single-column lookups (fooByA, fooByB); it will not be cached. Set keys.Foo in TypeMap config.')
     })
 
     it('logs and sets no key for a composite lookup', async () => {
         mockTypes(types([composite], [pair]))
-        const map = await TypeMap({api: '/graphql'})
+        const map = await TypeMap({api: '/graphql', httpClient: axios})
         expect(map.__keys).toEqual({EntityType: 'type'})
         expect(logSpy).toHaveBeenCalledWith('delv: Pair has no id and no single-column lookup; it will not be cached. Set keys.Pair in TypeMap config.')
     })
 
     it('skips the log for types configured with keys during introspection', async () => {
         mockTypes(types([composite], [pair]))
-        await TypeMap({api: '/graphql', keys: {Pair: 'left'}})
+        await TypeMap({api: '/graphql', httpClient: axios, keys: {Pair: 'left'}})
         expect(logSpy).not.toHaveBeenCalled()
     })
 
     it('lets configured keys override detection and serializes them', async () => {
         mockTypes(types([composite], [pair]))
-        const map = await TypeMap({api: '/graphql'})
+        const map = await TypeMap({api: '/graphql', httpClient: axios})
         const configured = TypeMap({typeMap: map, keys: {EntityType: 'description', Pair: 'left'}})
         expect(configured.getKey('EntityType')).toBe('description')
         expect(configured.getKey('Pair')).toBe('left')
@@ -303,7 +301,7 @@ describe('cache keys', () => {
 
     it('logs a configured key that is not a field of its type', async () => {
         mockTypes(types())
-        const map = await TypeMap({api: '/graphql'})
+        const map = await TypeMap({api: '/graphql', httpClient: axios})
         TypeMap({typeMap: map, keys: {EntityType: 'missing'}})
         expect(logSpy).toHaveBeenCalledWith("delv: keys.EntityType = 'missing' is not a field of EntityType")
     })
@@ -318,7 +316,7 @@ it('retains nested list and non-null wrappers and enum values from introspection
         {name: 'Query', fields: [{name: 'scores', type: {kind: 'NON_NULL', ofType: {kind: 'LIST', ofType: {kind: 'NON_NULL', ofType: {kind: 'SCALAR', name: 'Float'}}}}}]},
         {name: 'Status', enumValues: [{name: 'ACTIVE'}]}
     ])
-    const map = TypeMap({typeMap: await TypeMap({api: 'http://fixture/graphql'})})
+    const map = TypeMap({typeMap: await TypeMap({api: 'http://fixture/graphql', httpClient: axios})})
     expect(map.getFieldType('Query', 'scores')).toBe('[Float!]!')
     expect(map.getFields('Query').scores).toBe('Float')
     expect(map.getEnumValues('Status')).toEqual(['ACTIVE'])

@@ -37,3 +37,23 @@ test('panel opts in, filters events, inspects cache, pauses and cleans up subscr
     expect(unsubscribe).toHaveBeenCalled()
     jest.useRealTimers()
 })
+
+test('drag icon moves the open panel and is absent while collapsed', () => {
+    const sidecar = createDebugSidecar()
+    sidecar.connect({inspectCache: () => ({}), subscribe: () => () => {}})
+    const rect = {left: 100, top: 200, width: 600, height: 460, getBoundingClientRect() { return rect }}
+    let panel
+    act(() => { panel = create(<DelvDebugPanel sidecar={sidecar} enabled defaultOpen />) })
+    const icon = panel.root.findByProps({'aria-label': 'Drag debug panel'})
+    expect(panel.root.findByType('header').props.onPointerDown).toBeUndefined()
+    act(() => icon.props.onPointerDown({button: 0, clientX: 120, clientY: 220, target: {}, currentTarget: rect}))
+    act(() => { window.dispatchEvent(new MouseEvent('pointermove', {clientX: 180, clientY: 260})) })
+    act(() => { window.dispatchEvent(new MouseEvent('pointerup')) })
+    const section = panel.root.findByType('section')
+    expect(section.props.style.left).toBe(160)
+    expect(section.props.style.top).toBe(240)
+    act(() => panel.root.findAllByType('button').find(button => button.children.join('') === 'Collapse').props.onClick())
+    expect(panel.root.findAllByProps({'aria-label': 'Drag debug panel'})).toHaveLength(0)
+    expect(panel.root.findByType('button').props.onPointerDown).toBeUndefined()
+    act(() => panel.unmount())
+})

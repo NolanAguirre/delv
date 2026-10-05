@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for networkPolicy/CacheFirst.js</title>
+    <title>Code coverage report for cache/Compare.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -18,34 +18,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">networkPolicy</a> CacheFirst.js</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">cache</a> Compare.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.45% </span>
+                <span class="strong">92.31% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>21/22</span>
+                <span class='fraction'>24/26</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.67% </span>
+                <span class="strong">82% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>11/12</span>
+                <span class='fraction'>41/50</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>18/18</span>
+                <span class='fraction'>21/21</span>
             </div>
         
             
@@ -85,67 +85,64 @@
 <a name='L27'></a><a href='#L27'>27</a>
 <a name='L28'></a><a href='#L28'>28</a>
 <a name='L29'></a><a href='#L29'>29</a>
-<a name='L30'></a><a href='#L30'>30</a>
-<a name='L31'></a><a href='#L31'>31</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">9x</span>
+<a name='L30'></a><a href='#L30'>30</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">49x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">49x</span>
-<span class="cline-any cline-yes">89x</span>
-<span class="cline-any cline-yes">89x</span>
-<span class="cline-any cline-yes">89x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">35x</span>
+<span class="cline-any cline-yes">35x</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">21x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">49x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">56x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const NetworkFirst = require('./NetworkFirst')
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const numericTypes = new Set(['Int', 'Float', 'BigInt', 'BigFloat', 'Decimal', 'Numeric'])
 &nbsp;
-class CacheFirst extends NetworkFirst {
-    getName = () =&gt; 'cache-first'
-&nbsp;
-    getCachedResult = ({query, variables, cacheProcess}) =&gt; {
-        <span class="missing-if-branch" title="if path not taken" >I</span>if(this.queryManager.get({query, variables}).isMutation) <span class="cstat-no" title="statement not covered" >return undefined</span>
-        try {
-            return this.cache.read({query, variables, cacheProcess})
-        } catch {
-            return undefined
+// PostGraphile represents arbitrary precision numerics as strings. Compare
+// decimal digits directly rather than lexically or through a lossy Number cast.
+const decimal = (value) =&gt; {
+    const match = String(value).match(/^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/)
+    <span class="missing-if-branch" title="if path not taken" >I</span>if(!match || !(match[2] || <span class="branch-1 cbranch-no" title="branch not covered" >match[3])</span>) <span class="cstat-no" title="statement not covered" >return null</span>
+    const digits = (match[2] + (match[3] || '')).replace(/^0+/, '') || '0'
+    return {digits, sign: digits === '0' ? 0 : match[1] === '-' ? -1 : 1,
+        magnitude: digits.length - (match[3] || '').length + Number(match[4] || 0)}
+}
+const compare = (a, b, type) =&gt; {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if(a == null || b == null) <span class="cstat-no" title="statement not covered" >return a == b ? 0 : a == null ? 1 : -1</span>
+    if(numericTypes.has(type)){
+        const left = decimal(a)
+        const right = decimal(b)
+        <span class="missing-if-branch" title="else path not taken" >E</span>if(left &amp;&amp; right){
+            if(left.sign !== right.sign) return left.sign &lt; right.sign ? -1 : <span class="branch-1 cbranch-no" title="branch not covered" >1</span>
+            if(!left.sign) return 0
+            if(left.magnitude !== right.magnitude) return (left.magnitude &lt; right.magnitude ? -1 : 1) * left.sign
+            const length = Math.max(left.digits.length, right.digits.length)
+            const x = left.digits.padEnd(length, '0')
+            const y = right.digits.padEnd(length, '0')
+            return (x &lt; y ? -1 : x &gt; y ? 1 : 0) * left.sign
         }
     }
-&nbsp;
-    // Deliver a synchronous snapshot while the promise represents the final result.
-    process = ({onResult, ...options}) =&gt; {
-        const cached = this.getCachedResult(options)
-        if(cached !== undefined &amp;&amp; onResult) onResult(cached)
-        const {query, variables} = options
-        const completed = this.queryManager.get({query, variables}).success
-        const promise = completed ? Promise.resolve(cached) : this.fetch(options)
-        if(!onResult || completed) return promise
-        return promise.then(data =&gt; {
-            onResult(data)
-            return data
-        })
-    }
+    return a &lt; b ? -1 : a &gt; b ? 1 : 0
 }
-&nbsp;
-module.exports = CacheFirst
+module.exports = compare
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->

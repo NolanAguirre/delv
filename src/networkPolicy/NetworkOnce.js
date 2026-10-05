@@ -1,11 +1,7 @@
 const QueryRequest = require('../network/QueryRequest')
+const NetworkFirst = require('./NetworkFirst')
 
-class NetworkOnce {
-    constructor({cache, network, queryManager}){
-        this.cache = cache
-        this.network = network
-        this.queryManager = queryManager
-    }
+class NetworkOnce extends NetworkFirst {
     getName = () => 'network-once'
 
     process = ({query, variables, cacheProcess, ...other}) => {

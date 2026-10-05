@@ -1,6 +1,4 @@
-jest.mock('axios')
-
-const axios = require('axios')
+const axios = {post: jest.fn()}
 const {parse} = require('graphql')
 const AxiosWithErrors = require('../../src/network/AxiosWithErrors')
 
@@ -14,7 +12,7 @@ describe('AxiosWithErrors', () => {
 
     it.each(['{ user { id } }', '{\n  user { id }\n}'])(
         'injects __typename into nested selections: %s', (query) => {
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         axios.post.mockResolvedValue({data: {data: {user: {id: '1'}}}})
 
         return network.post({query, variables}).then(() => {
@@ -41,7 +39,7 @@ describe('AxiosWithErrors', () => {
             '{ user(name: "A  B { text }") { id __typename } }']
     ])('preserves selections and ensures an unaliased typename: %s', async (query, expected) => {
         axios.post.mockResolvedValue({data: {data: {}}})
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         await network.post({query, variables})
         const sent = axios.post.mock.calls[0][1].query
         expect(parse(sent, {noLocation: true})).toEqual(parse(expected, {noLocation: true}))
@@ -51,13 +49,13 @@ describe('AxiosWithErrors', () => {
     })
 
     it('rejects invalid GraphQL without sending a request', async () => {
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         await expect(network.post({query: '{ user {', variables})).rejects.toThrow('Syntax Error')
         expect(axios.post).not.toHaveBeenCalled()
     })
 
     it('resolves with the response on success', () => {
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         const res = {data: {data: {user: {id: '1'}}}}
         axios.post.mockResolvedValue(res)
 
@@ -65,7 +63,7 @@ describe('AxiosWithErrors', () => {
     })
 
     it('rejects with res.data.errors when present', () => {
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         const errors = [{message: 'boom'}]
         axios.post.mockResolvedValue({data: {errors}})
 
@@ -73,7 +71,7 @@ describe('AxiosWithErrors', () => {
     })
 
     it('rejects on a network error', () => {
-        const network = new AxiosWithErrors({url})
+        const network = new AxiosWithErrors({url, httpClient: axios})
         const error = new Error('network down')
         axios.post.mockRejectedValue(error)
 
